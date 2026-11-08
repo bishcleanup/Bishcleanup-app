@@ -1,0 +1,1160 @@
+<title>Bish Cleanup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: phone-first app shell. Sticky brand header, one scrolling view, floating bottom tab bar. Wide screens center the view at 760px. */
+:root{
+  --bg:#f2f6f3; --surface:#ffffff; --surface2:#e8efea; --line:#d3ddd6; --fg:#0e1a14; --muted:#56675d;
+  --brand:#047857; --brand-ink:#ffffff; --brand-text:#047857; --brand-soft:#d6f0e3;
+  --lime:#ccff00; --lime-ink:#10200a;
+  --new:#1d4ed8; --new-soft:#dbe6fd; --quoted:#92400e; --quoted-soft:#fdeccb;
+  --sched:#047857; --sched-soft:#d6f0e3; --cancelled:#55615a; --cancelled-soft:#e3e8e5;
+  --danger:#b91c1c; --danger-soft:#fde2e2; --scrim:rgba(8,20,14,.55);
+  --shadow:0 1px 2px rgba(10,30,20,.06),0 10px 28px rgba(10,30,20,.07);
+  --font-display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --font-body:'Figtree',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#09100c; --surface:#111a15; --surface2:#1a2720; --line:#26372d; --fg:#e7f0ea; --muted:#95aa9d;
+    --brand:#047857; --brand-ink:#ffffff; --brand-text:#3ddc97; --brand-soft:#0f2e22;
+    --new:#8db4ff; --new-soft:#14284f; --quoted:#f6c873; --quoted-soft:#3a2a0c;
+    --sched:#3ddc97; --sched-soft:#0f2e22; --cancelled:#aab6af; --cancelled-soft:#222d27;
+    --danger:#ff8a8a; --danger-soft:#3b1515; --scrim:rgba(0,0,0,.65);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#09100c; --surface:#111a15; --surface2:#1a2720; --line:#26372d; --fg:#e7f0ea; --muted:#95aa9d;
+  --brand:#047857; --brand-ink:#ffffff; --brand-text:#3ddc97; --brand-soft:#0f2e22;
+  --new:#8db4ff; --new-soft:#14284f; --quoted:#f6c873; --quoted-soft:#3a2a0c;
+  --sched:#3ddc97; --sched-soft:#0f2e22; --cancelled:#aab6af; --cancelled-soft:#222d27;
+  --danger:#ff8a8a; --danger-soft:#3b1515; --scrim:rgba(0,0,0,.65);
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.35);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:70;background:var(--surface)}
+h1,h2,h3,p,dl,dd,dt,ul{margin:0;padding:0}
+h1,h2,h3{font-family:var(--font-display);letter-spacing:-.01em;text-wrap:balance}
+h1{font-size:26px;font-weight:800;line-height:1.1}
+h2{font-size:21px;font-weight:800}
+h3{font-size:17px;font-weight:700}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--brand-text)}
+:focus-visible{outline:2px solid var(--brand-text);outline-offset:2px}
+.ic{width:18px;height:18px;flex:none}
+.tnum{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px))) calc(-1*max(16px,env(safe-area-inset-right,0px)));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--surface);border-bottom:1px solid var(--line)}
+.top-in{max-width:760px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--fg);cursor:pointer;border:0;background:none;padding:0}
+.mark{width:36px;height:36px;flex:none}
+.wm{font-family:var(--font-display);font-weight:800;font-size:21px;letter-spacing:-.02em;line-height:1}
+.wm em{font-style:normal;font-weight:600;color:var(--brand-text);margin-left:4px}
+.top-r{display:flex;align-items:center;gap:8px}
+.icon-btn{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);cursor:pointer;color:var(--fg)}
+.icon-btn:hover{border-color:var(--brand-text)}
+.avatar-btn{padding:0;border:2px solid var(--brand-text);border-radius:50%;background:none;cursor:pointer;width:38px;height:38px;overflow:hidden}
+.av{display:inline-grid;place-items:center;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;object-fit:cover;overflow:hidden;flex:none}
+
+/* main */
+main{max-width:760px;margin:0 auto;padding-block:20px 120px;display:flex;flex-direction:column;gap:16px}
+.vh{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-text);margin-bottom:4px}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+
+/* controls */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;color:var(--fg);min-height:42px;line-height:1.2}
+.btn:hover{border-color:var(--brand-text)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{background:transparent;border-color:var(--danger);color:var(--danger)}
+.btn.block{width:100%}
+.btn.sm{padding:6px 12px;min-height:34px;font-size:13px;border-radius:10px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--brand-soft);border-color:var(--brand-text);color:var(--brand-text)}
+.chip b{font-variant-numeric:tabular-nums;font-size:12px;opacity:.8}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>span,.lbl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.02em}
+input,select,textarea{width:100%;min-width:0;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-size:15px}
+textarea{resize:vertical;min-height:70px}
+input::placeholder,textarea::placeholder{color:var(--muted)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.form{display:flex;flex-direction:column;gap:14px}
+.err{color:var(--danger);font-size:13px;font-weight:600;min-height:0}
+.err:empty{display:none}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;border-radius:14px;background:var(--surface2);border:1px solid var(--line)}
+.seg button{padding:9px;border:0;border-radius:10px;background:none;font-weight:600;font-size:13px;cursor:pointer;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:var(--shadow)}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow)}
+.card.flat{box-shadow:none}
+.card.dim{opacity:.7}
+.bk{display:flex;flex-direction:column;gap:12px;cursor:pointer}
+.bk:hover{border-color:var(--brand-text)}
+.bk-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.bk-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.kind{font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--muted);margin-top:2px}
+.price{font-family:var(--font-display);font-weight:800;font-size:20px;font-variant-numeric:tabular-nums}
+.slot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--brand-text);font-weight:700}
+.slot em{font-style:normal;color:var(--muted);font-weight:500;font-size:12px}
+.slot.big{font-size:17px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{min-width:0;overflow-wrap:anywhere;font-weight:600}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.st-new{background:var(--new-soft);color:var(--new)}
+.st-quoted{background:var(--quoted-soft);color:var(--quoted)}
+.st-scheduled{background:var(--sched-soft);color:var(--sched)}
+.st-cancelled{background:var(--cancelled-soft);color:var(--cancelled)}
+.note{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);font-size:14px}
+.note.warn{border-color:var(--quoted);background:var(--quoted-soft);color:var(--quoted)}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumbs img{width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid var(--line);cursor:zoom-in}
+.thumbs .rm{position:relative}
+.thumbs .rm button{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;padding:0}
+.empty{text-align:center;padding:36px 16px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:8px}
+.empty .dot{width:52px;height:52px;border-radius:50%;background:var(--brand-soft);color:var(--brand-text);display:grid;place-items:center}
+.empty h3{color:var(--fg)}
+
+/* calendar */
+.cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .dw{font-size:11px;font-weight:700;color:var(--muted);padding:4px 0}
+.cal button{position:relative;aspect-ratio:1;max-height:44px;border-radius:12px;border:1px solid transparent;background:none;cursor:pointer;font-weight:600;font-variant-numeric:tabular-nums}
+.cal button:hover{background:var(--surface2)}
+.cal button.today{border-color:var(--brand-text)}
+.cal button.sel{background:var(--brand);color:#fff}
+.cal button.has::after{content:"";position:absolute;bottom:4px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--brand-text)}
+.cal button.sel.has::after{background:var(--lime)}
+
+/* bottom nav */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:55;padding:8px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));pointer-events:none}
+.nav-in{pointer-events:auto;max-width:620px;margin:0 auto;display:flex;gap:2px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow)}
+.nav button{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px;border:0;border-radius:18px;background:none;cursor:pointer;color:var(--muted);font-size:10.5px;font-weight:700}
+.nav button.on{background:var(--brand-soft);color:var(--brand-text)}
+.nav .badge{position:absolute;top:4px;right:calc(50% - 20px);min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--danger);color:#fff;font-size:10px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+
+/* modal */
+.scrim{position:fixed;inset:0;z-index:80;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.sheet{width:100%;max-width:560px;max-height:92vh;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:24px 24px 0 0;padding:20px 20px calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px}
+@media (min-width:700px){.scrim{align-items:center;padding-bottom:16px}.sheet{border-radius:24px}}
+.sh-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.lightbox{max-width:92vw;max-height:80vh;border-radius:16px}
+
+/* toast */
+.toasts{position:fixed;left:0;right:0;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:90;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding-inline:16px}
+.toast{pointer-events:auto;max-width:420px;padding:11px 16px;border-radius:14px;background:var(--fg);color:var(--bg);font-weight:600;font-size:14px;box-shadow:var(--shadow);display:flex;gap:10px;align-items:center}
+.toast.err{background:var(--danger);color:#fff}
+
+/* clock */
+.clock{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.clock .time{font-family:var(--font-display);font-weight:800;font-size:54px;letter-spacing:.02em;font-variant-numeric:tabular-nums;line-height:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border-radius:999px;background:var(--surface2);color:var(--muted)}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--danger)}
+.pill.work{color:var(--sched);background:var(--sched-soft)}.pill.work i{background:var(--sched)}
+.pill.lunch,.pill.break{color:var(--quoted);background:var(--quoted-soft)}.pill.lunch i,.pill.break i{background:var(--quoted)}
+.clock-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;width:100%}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:560px}
+th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 12px;background:var(--surface2);white-space:nowrap}
+td{padding:10px 12px;border-top:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+td.num,th.num{text-align:right}
+
+/* lists */
+.list{display:flex;flex-direction:column}
+.li{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-top:1px solid var(--line);cursor:default}
+.li:first-child{border-top:0}
+.li.click{cursor:pointer}.li.click:hover{background:var(--surface2)}
+.li .ico{width:38px;height:38px;border-radius:50%;background:var(--brand-soft);color:var(--brand-text);display:grid;place-items:center;flex:none}
+.li .ico.bad{background:var(--danger-soft);color:var(--danger)}
+.li h4{margin:0;font-size:15px;font-weight:700}
+.li p{color:var(--muted);font-size:14px}
+.li small{color:var(--muted);font-size:12px}
+.li.unread h4::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--brand-text);margin-left:8px}
+.list.card{padding:0;overflow:hidden}
+
+/* chat */
+.chat{display:flex;flex-direction:column;gap:8px;padding:6px 0}
+.bub{max-width:82%;padding:10px 14px;border-radius:18px;font-size:14.5px;overflow-wrap:anywhere}
+.bub.me{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:6px}
+.bub.them{align-self:flex-start;background:var(--surface2);border-bottom-left-radius:6px}
+.bub small{display:block;font-size:11px;opacity:.75;margin-top:4px}
+.compose{display:flex;gap:8px;position:sticky;bottom:calc(88px + env(safe-area-inset-bottom,0px))}
+
+/* auth */
+.auth{max-width:460px;margin:0 auto;padding-block:max(20px,env(safe-area-inset-top,0px)) 40px;display:flex;flex-direction:column;gap:20px}
+.hero{position:relative;overflow:hidden;border-radius:26px;padding:28px 24px;background:#07281c;color:#fff;display:flex;flex-direction:column;gap:12px;min-height:210px;justify-content:flex-end}
+.hero svg.art{position:absolute;right:-30px;top:-30px;width:210px;height:210px;opacity:.9}
+.hero .mark{width:54px;height:54px;position:relative}
+.hero h1{font-size:34px;position:relative;color:#fff}
+.hero p{position:relative;color:#bfe6d3;max-width:32ch}
+.hero .lime{color:var(--lime)}
+
+@media (prefers-reduced-motion:no-preference){.toast{animation:up .2s ease-out}@keyframes up{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="mark" viewBox="0 0 48 48">
+    <rect width="48" height="48" rx="13" fill="#047857"/>
+    <path d="M24 7l3.4 10.2L38 20.5l-10.6 3.3L24 34l-3.4-10.2L10 20.5l10.6-3.3z" fill="#ffffff"/>
+    <path d="M38 5l1.3 3.7L43 10l-3.7 1.3L38 15l-1.3-3.7L33 10l3.7-1.3z" fill="#ccff00"/>
+    <path d="M9 41c9-4 21-4 30 0" stroke="#ccff00" stroke-width="3.2" stroke-linecap="round" fill="none"/>
+  </symbol>
+</defs></svg>
+
+<div id="app"></div>
+<div id="modal"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- small helpers ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ls={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+
+const ICONS={
+  calendar:'<rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M8 2.5v4M16 2.5v4M3 10h18"/>',
+  list:'<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  bell:'<path d="M6 9a6 6 0 1112 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 004 0"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>',
+  chat:'<path d="M21 12a8 8 0 01-11.6 7.1L4 20l1.1-4.6A8 8 0 1121 12z"/>',
+  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>',
+  text:'<path d="M4 5h16a1 1 0 011 1v10a1 1 0 01-1 1H9l-5 4V6a1 1 0 011-1z"/><path d="M8 10h8M8 13h5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  camera:'<path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.5"/>',
+  download:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
+  trash:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  logout:'<path d="M9 4H5a1 1 0 00-1 1v14a1 1 0 001 1h4M16 8l4 4-4 4M20 12H9"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.7a3.5 3.5 0 010 6.6M18 14.5c2.2.7 3.5 2.6 3.5 5.5"/>',
+  pin:'<path d="M12 21s7-6 7-11a7 7 0 10-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  chev:'<path d="M9 5l7 7-7 7"/>',
+  send:'<path d="M4 12l16-8-6 17-3-7-7-2z"/>',
+  search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
+  link:'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  moon:'<path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/>',
+  note:'<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h5"/>',
+  tag:'<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.3"/>'
+};
+const ic=(n,c)=>'<svg class="ic'+(c?' '+c:'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(ICONS[n]||'')+'</svg>';
+
+//#pure-start
+const pad=n=>String(n).padStart(2,'0');
+const dayKey=ts=>{const d=new Date(ts);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
+const money=n=>'$'+Number(n||0).toFixed(2);
+function emailKey(e){return String(e||'').trim().toLowerCase().replace(/[^a-z0-9._~:@+-]/g,'_')}
+function tagFromName(n){const p=String(n||'').trim().split(/\s+/).filter(Boolean);if(!p.length)return 'Team';if(p.length===1)return p[0];return p[0]+' '+p[p.length-1][0].toUpperCase()+'.'}
+function hm(ms){const m=Math.max(0,Math.round(ms/60000));return Math.floor(m/60)+'h '+pad(m%60)+'m'}
+function finishShift(c,end){
+  if(c.lunchStart){c.lunchMs+=end-c.lunchStart;c.lunchStart=null}
+  if(c.breakStart){c.breakMs+=end-c.breakStart;c.breakStart=null}
+  c.endTs=end;c.paidMs=Math.max(0,end-c.inTs-c.lunchMs);
+}
+function computeShifts(events,now){
+  const ev=events.slice().sort((a,b)=>a.ts-b.ts),out=[];let cur=null;
+  for(const e of ev){
+    if(e.type==='in'){
+      if(cur){finishShift(cur,e.ts);cur.forced=true;out.push(cur)}
+      cur={userId:e.userId,name:e.name,inTs:e.ts,outTs:null,lunchMs:0,breakMs:0,lunchStart:null,breakStart:null,open:false};
+    }else if(!cur){continue}
+    else if(e.type==='lunch_start'){cur.lunchStart=e.ts}
+    else if(e.type==='lunch_end'){if(cur.lunchStart){cur.lunchMs+=e.ts-cur.lunchStart;cur.lunchStart=null}}
+    else if(e.type==='break_start'){cur.breakStart=e.ts}
+    else if(e.type==='break_end'){if(cur.breakStart){cur.breakMs+=e.ts-cur.breakStart;cur.breakStart=null}}
+    else if(e.type==='out'){cur.outTs=e.ts;finishShift(cur,e.ts);out.push(cur);cur=null}
+  }
+  if(cur){const st=cur.lunchStart?'lunch':cur.breakStart?'break':'work';finishShift(cur,now);cur.open=true;cur.state=st;out.push(cur)}
+  return out;
+}
+function csvCell(v){let s=String(v==null?'':v);if(/^[=+\-@]/.test(s))s="'"+s;return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+//#pure-end
+
+const fmtDate=ts=>new Date(ts).toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+const fmtTime=ts=>new Date(ts).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+const fmtSlot=ts=>fmtDate(ts)+' · '+fmtTime(ts);
+const fmtStamp=ts=>new Date(ts).toLocaleDateString([],{month:'short',day:'numeric'})+' at '+fmtTime(ts);
+const b64e=u=>btoa(String.fromCharCode.apply(null,u));
+const b64d=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const rid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+
+const SERVICES=['Deep Clean','Painting','Handyman Repair','Gutter & Roof Upkeep','Property Upkeep'];
+const PROPS=['House','Apartment or condo','Rental turnover','Commercial space'];
+const FREQ=['One time','Weekly','Every 2 weeks','Monthly'];
+const TIMING=['As soon as possible','This week','Next 2 weeks','Flexible'];
+const COUNTIES=['Lewis','Cowlitz','Clark','Thurston'];
+const HOURS=[8,10,12,14,16];
+const STATUS={new:'New',quoted:'Quoted',scheduled:'Scheduled',cancelled:'Cancelled'};
+const chip=s=>'<span class="st st-'+esc(s)+'">'+esc(STATUS[s]||s)+'</span>';
+const SLOT_MS=2*3600000;
+
+/* ---------- state ---------- */
+const S={
+  db:null,user:null,dl:null,isOwner:false,me:null,
+  accounts:[],bookings:[],alerts:[],messages:[],logs:[],invites:[],settings:{},
+  view:'bookings',filter:'new',selDay:null,cal:null,thread:null,msgQ:'',teamQ:'',mineOnly:false,
+  period:'week',cFrom:'',cTo:'',unsubs:[],dismissed:{},reminding:{},slow:false,
+  theme:ls.get('bish.theme')||'system',joinToken:null,busy:false,seenAlerts:null
+};
+let M={};   /* modal scratch state */
+
+/* ---------- toast / modal ---------- */
+function toast(msg,kind){
+  const t=document.createElement('div');t.className='toast'+(kind==='err'?' err':'');
+  t.innerHTML=(kind==='err'?ic('x'):ic('check'))+'<span>'+esc(msg)+'</span>';
+  $('#toasts').appendChild(t);setTimeout(()=>t.remove(),kind==='err'?5200:3200);
+}
+function openModal(html,opts){
+  M=Object.assign({},opts||{});
+  $('#modal').innerHTML='<div class="scrim" data-scrim><div class="sheet" role="dialog" aria-modal="true">'+html+'</div></div>';
+  const f=$('#modal input:not([type=file]),#modal select,#modal textarea');if(f&&!(opts&&opts.noFocus))setTimeout(()=>{try{f.focus({preventScroll:true})}catch(e){}},30);
+}
+function closeModal(force){if(M.blocking&&!force)return;$('#modal').innerHTML='';M={}}
+function errMsg(e){
+  const c=e&&e.code;
+  if(c==='invalid_argument')return "Couldn't save. This account may not have permission to change shared data. Ask the page owner for Contributor access.";
+  if(c==='quota_exceeded')return 'Storage is full. Remove old records and try again.';
+  if(c==='resource_exhausted')return 'Too many requests at once. Wait a moment and try again.';
+  if(c==='revoked')return 'Access to this page changed. Reload to continue.';
+  return 'Something went wrong. Try again.';
+}
+async function w(fn){
+  try{return await fn()}
+  catch(e){
+    if(e&&e.code==='unavailable'){await new Promise(r=>setTimeout(r,300+Math.random()*400));return await fn()}
+    throw e;
+  }
+}
+
+/* ---------- crypto / accounts ---------- */
+async function hashPw(pw,saltB64){
+  if(!(window.crypto&&crypto.subtle))throw {code:'nocrypto'};
+  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:b64d(saltB64),iterations:100000,hash:'SHA-256'},key,256);
+  return b64e(new Uint8Array(bits));
+}
+const newSalt=()=>b64e(crypto.getRandomValues(new Uint8Array(16)));
+async function createAccount(o){
+  const id=emailKey(o.email);if(!id||id.indexOf('@')<1)throw {code:'bademail'};
+  if(String(o.password||'').length<8)throw {code:'shortpw'};
+  const ref=S.db.doc('accounts/'+id);
+  const ex=await ref.get();if(ex.exists)throw {code:'exists'};
+  const salt=newSalt(),hash=await hashPw(o.password,salt);
+  const a={name:o.name.trim(),email:o.email.trim().toLowerCase(),role:o.role,tag:tagFromName(o.name),salt:salt,hash:hash,avatar:'',phone:(o.phone||'').trim(),createdAt:Date.now()};
+  await w(()=>ref.set(a));
+  return Object.assign({id:id},a);
+}
+function authErr(e){
+  const c=e&&e.code;
+  if(c==='exists')return 'An account with that email already exists. Sign in instead.';
+  if(c==='bademail')return 'Enter a valid email address.';
+  if(c==='shortpw')return 'Use a password with at least 8 characters.';
+  if(c==='nouser'||c==='badpw')return "That email and password don't match an account.";
+  if(c==='nocrypto')return "This browser can't protect passwords here. Open the page in a current browser.";
+  return errMsg(e);
+}
+async function signIn(email,pw){
+  const id=emailKey(email);
+  const snap=await S.db.doc('accounts/'+id).get();
+  if(!snap.exists)throw {code:'nouser'};
+  const a=snap.data(),h=await hashPw(pw,a.salt);
+  if(h!==a.hash)throw {code:'badpw'};
+  S.me=Object.assign({id:id},a);
+  ls.set('bish.session',JSON.stringify({id:id,hash:h}));
+  startApp();
+}
+async function restoreSession(){
+  let s=null;try{s=JSON.parse(ls.get('bish.session')||'null')}catch(e){}
+  if(!s||!s.id)return false;
+  try{
+    const snap=await S.db.doc('accounts/'+s.id).get();
+    if(!snap.exists||snap.data().hash!==s.hash){ls.del('bish.session');return false}
+    S.me=Object.assign({id:s.id},snap.data());startApp();return true;
+  }catch(e){return false}
+}
+function logout(){
+  stopSubs();ls.del('bish.session');S.me=null;S.view='bookings';S.thread=null;
+  closeModal(true);renderAuth();
+}
+
+/* ---------- subscriptions ---------- */
+function stopSubs(){S.unsubs.forEach(f=>{try{f()}catch(e){}});S.unsubs=[];if(S.tick){clearInterval(S.tick);S.tick=null}}
+const docs=snap=>snap.docs.map(d=>Object.assign({id:d.id},d.data()));
+function sub(q,fn,name){
+  let first=true;
+  const t=setTimeout(()=>{if(first){S.slow=true;scheduleRender()}},10000);
+  const un=q.onSnapshot(snap=>{if(first){first=false;clearTimeout(t);if(S.slow){S.slow=false}}fn(snap)},err=>{clearTimeout(t);console.warn(name,err);if(err&&err.code==='revoked'){S.revoked=true;scheduleRender()}});
+  S.unsubs.push(()=>{clearTimeout(t);un()});
+}
+const isStaff=()=>S.me&&(S.me.role==='admin'||S.me.role==='team');
+const isAdmin=()=>S.me&&S.me.role==='admin';
+function startApp(){
+  stopSubs();
+  const db=S.db,me=S.me,id=me.id,role=me.role;
+  S.startedAt=Date.now();S.alertsInit=false;
+  S.filter=isStaff()?'new':'all';
+  const allowed=navFor().map(n=>n[0]);if(S.view!=='team'&&allowed.indexOf(S.view)<0)S.view='bookings';
+  S.seenAlerts=Number(ls.get('bish.seen.'+id)||0);S.clearedBefore=Number(ls.get('bish.cleared.'+id)||0);
+  renderShell();
+  sub(db.doc('accounts/'+id),snap=>{
+    if(!snap.exists){logout();return}
+    const a=Object.assign({id:id},snap.data()),changed=S.me.role!==a.role;
+    S.me=a;if(changed){startApp();return}
+    afterData();
+  },'me');
+  if(role==='admin')sub(db.collection('accounts'),s=>{S.accounts=docs(s);afterData()},'accounts');
+  else if(role==='team')sub(db.collection('accounts').where('role','in',['admin','team']),s=>{S.accounts=docs(s);afterData()},'accounts');
+  sub(isStaff()?db.collection('bookings'):db.collection('bookings').where('customerId','==',id),s=>{S.bookings=docs(s);afterData()},'bookings');
+  sub(db.collection('alerts').where('to','in',isStaff()?['staff','u:'+id]:['u:'+id]),s=>{
+    const list=docs(s);
+    if(S.alertsInit){s.docChanges().forEach(c=>{if(c.type==='added'){const d=c.doc.data();if(d.ts>S.startedAt)toast(d.title+(d.detail?' — '+d.detail:''))}})}
+    S.alertsInit=true;S.alerts=list;afterData();
+  },'alerts');
+  sub(isStaff()?db.collection('messages'):db.collection('messages').where('threadId','==',id),s=>{S.messages=docs(s);afterData()},'messages');
+  if(isStaff())sub(role==='admin'?db.collection('timelogs'):db.collection('timelogs').where('userId','==',id),s=>{S.logs=docs(s);afterData()},'timelogs');
+  if(role==='admin')sub(db.collection('invites'),s=>{S.invites=docs(s);afterData()},'invites');
+  sub(db.doc('settings/main'),s=>{S.settings=s.exists?s.data():{};afterData()},'settings');
+  S.tc=0;
+  S.tick=setInterval(()=>{tickClock();checkReminders();S.tc++;if(S.tc%30===0)scheduleRender()},1000);
+}
+function afterData(){scheduleRender();checkReminders();ensureAvatarGate()}
+
+/* ---------- reminders (one hour before) ---------- */
+let lastRem=0;
+function checkReminders(){
+  const now=Date.now();if(now-lastRem<20000||!S.me||!S.db)return;lastRem=now;
+  S.bookings.forEach(b=>{
+    if(b.status!=='scheduled'||b.remindedSlot===b.slotTs)return;
+    const d=b.slotTs-now;if(d<=0||d>3600000)return;
+    if(!(S.me.role==='admin'||b.assigneeId===S.me.id||b.customerId===S.me.id))return;
+    const key=b.id+':'+b.slotTs;if(S.reminding[key])return;S.reminding[key]=1;
+    (async()=>{
+      try{
+        await w(()=>S.db.doc('bookings/'+b.id).update({remindedSlot:b.slotTs}));
+        const t='Reminder: '+b.service+' in about an hour';
+        await pushAlert('u:'+b.customerId,t,fmtTime(b.slotTs)+' at '+b.address+' with '+(b.tag||'our team'),'reminder',b.id);
+        await pushAlert(b.assigneeId?'u:'+b.assigneeId:'staff',t,b.customerName+' · '+fmtTime(b.slotTs)+' · '+b.address,'reminder',b.id);
+      }catch(e){delete S.reminding[key]}
+    })();
+  });
+}
+function pushAlert(to,title,detail,kind,bookingId){
+  return S.db.collection('alerts').add({to:to,title:title,detail:detail||'',kind:kind||'info',bookingId:bookingId||null,ts:Date.now()}).catch(()=>{});
+}
+function pushMessage(threadId,threadName,text,auto){
+  const me=S.me||{};
+  return S.db.collection('messages').add({threadId:threadId,threadName:threadName,text:text,fromId:auto?'system':me.id,fromName:auto?'Bish Cleanup':me.name,fromRole:auto?'staff':me.role,tag:auto?'':(me.tag||''),ts:Date.now(),auto:!!auto}).catch(()=>{});
+}
+
+/* ---------- render scheduling ---------- */
+let rq=0,dirty=false;
+function scheduleRender(){if(rq)return;rq=requestAnimationFrame(()=>{rq=0;doRender()})}
+function doRender(){
+  if(!S.me)return;
+  const a=document.activeElement;
+  const typing=a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&$('#view')&&$('#view').contains(a);
+  updateChrome();
+  if(S.view==='messages'&&S.thread&&$('#msgs')){$('#msgs').innerHTML=bubblesHTML();stickChat();return}
+  if(typing){dirty=true;return}
+  dirty=false;renderView();
+}
+document.addEventListener('focusout',()=>{if(dirty)setTimeout(()=>{const a=document.activeElement;if(dirty&&!(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)))scheduleRender()},450)});
+
+/* ---------- theme ---------- */
+function applyTheme(p){
+  S.theme=p;ls.set('bish.theme',p);
+  const r=document.documentElement;
+  if(p==='light'||p==='dark')r.setAttribute('data-theme',p);else r.removeAttribute('data-theme');
+}
+const isDarkNow=()=>{const t=document.documentElement.getAttribute('data-theme');return t?t==='dark':window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches};
+
+/* ---------- avatars / images ---------- */
+function avatar(a,size){
+  size=size||38;
+  if(a&&a.avatar)return '<img class="av" width="'+size+'" height="'+size+'" style="width:'+size+'px;height:'+size+'px" src="'+esc(a.avatar)+'" alt="">';
+  const n=(a&&a.name||'?').trim()[0]||'?';
+  return '<span class="av" style="width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*.42)+'px">'+esc(n.toUpperCase())+'</span>';
+}
+function loadImg(file){return new Promise((res,rej)=>{const fr=new FileReader();fr.onerror=rej;fr.onload=()=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=fr.result};fr.readAsDataURL(file)})}
+async function shrink(file,max,q,square,cap){
+  const im=await loadImg(file);let w0=im.naturalWidth,h0=im.naturalHeight,sx=0,sy=0,sw=w0,sh=h0;
+  if(square){const s=Math.min(w0,h0);sx=(w0-s)/2;sy=(h0-s)/2;sw=sh=s;w0=h0=s}
+  let scale=Math.min(1,max/Math.max(w0,h0)),out='';
+  for(let i=0;i<5;i++){
+    const c=document.createElement('canvas');c.width=Math.round(w0*scale);c.height=Math.round(h0*scale);
+    c.getContext('2d').drawImage(im,sx,sy,sw,sh,0,0,c.width,c.height);
+    out=c.toDataURL('image/jpeg',q);if(out.length<=cap)break;q=Math.max(.4,q-.1);scale*=.85;
+  }
+  return out;
+}
+
+/* ---------- auth screens ---------- */
+function heroHTML(title,sub){
+  return '<div class="hero"><svg class="art" viewBox="0 0 200 200" fill="none" aria-hidden="true"><path d="M100 10l22 68 68 22-68 22-22 68-22-68-68-22 68-22z" stroke="#1d7a58" stroke-width="2"/><path d="M100 42l13 45 45 13-45 13-13 45-13-45-45-13 45-13z" fill="#0b3b2a"/><path d="M165 20l5 14 14 5-14 5-5 14-5-14-14-5 14-5z" fill="#ccff00"/></svg>'+
+    '<svg class="mark"><use href="#mark"/></svg><h1>'+title+'</h1><p>'+sub+'</p></div>';
+}
+const TAGLINE='Property upkeep &amp; handyman services in Lewis, Cowlitz, Clark &amp; Thurston counties.';
+async function renderAuth(){
+  document.body.classList.remove('shell');
+  $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card"><p class="sub">Loading…</p></div></div>';
+  let empty=false;
+  try{const s=await S.db.collection('accounts').limit(1).get();empty=s.empty}catch(e){}
+  let card='';
+  if(S.joinToken){
+    let ok=false;try{const iv=await S.db.doc('invites/'+S.joinToken).get();ok=iv.exists}catch(e){}
+    card=ok?joinForm():'<div class="note warn">'+ic('x')+'<span>This signup link is no longer active. Ask the admin for a new one.</span></div><button class="btn block" data-action="auth-home">Back to sign in</button>';
+  }else if(empty){
+    card=S.isOwner?setupForm():'<div class="note">'+ic('clock')+'<span>Bish Cleanup is not set up yet. The page owner needs to create the admin account first.</span></div>';
+  }else{
+    card=(S.authTab==='signup')?signupForm():loginForm();
+  }
+  $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card stack">'+card+'</div></div>';
+}
+function tabsHTML(){
+  const s=S.authTab==='signup';
+  return '<div class="seg" role="tablist"><button class="'+(!s?'on':'')+'" data-action="auth-tab" data-tab="login">Sign in</button><button class="'+(s?'on':'')+'" data-action="auth-tab" data-tab="signup">Create account</button></div>';
+}
+const fld=(id,label,type,extra)=>'<label class="field"><span>'+label+'</span><input id="'+id+'" type="'+(type||'text')+'" '+(extra||'')+'></label>';
+function loginForm(){
+  return tabsHTML()+'<form class="form" data-form="login">'+fld('li-email','Email','email','autocomplete="username" required')+fld('li-pw','Password','password','autocomplete="current-password" required')+'<p class="err" id="auth-err" role="alert"></p><button class="btn primary block" type="submit">Sign in</button></form>';
+}
+function signupForm(){
+  return tabsHTML()+'<form class="form" data-form="signup"><p class="sub">Create a customer account to request quotes and see your bookings.</p>'+fld('su-name','Full name','text','autocomplete="name" required')+fld('su-email','Email','email','autocomplete="email" required')+fld('su-phone','Phone for texts and calls','tel','autocomplete="tel" placeholder="(360) 555-0100" required')+fld('su-pw','Password (8+ characters)','password','autocomplete="new-password" minlength="8" required')+'<p class="err" id="auth-err" role="alert"></p><button class="btn primary block" type="submit">Create account</button></form>';
+}
+function setupForm(){
+  return '<h2>Set up Bish Cleanup</h2><p class="sub">Create the admin account. You can add team members and signup links after you sign in.</p><form class="form" data-form="setup">'+fld('st-name','Your name','text','autocomplete="name" required')+fld('st-email','Email','email','autocomplete="username" required')+fld('st-phone','Office phone (customers call this to cancel or reschedule)','tel','placeholder="(360) 555-0100"')+fld('st-pw','Password (8+ characters)','password','autocomplete="new-password" minlength="8" required')+'<p class="err" id="auth-err" role="alert"></p><button class="btn primary block" type="submit">Create admin account</button></form>';
+}
+function joinForm(){
+  return '<h2>Join the Bish Cleanup team</h2><p class="sub">You will join with the Team role. You will add a profile picture on your first sign in.</p><form class="form" data-form="join">'+fld('jn-name','Full name','text','autocomplete="name" required')+fld('jn-email','Email','email','autocomplete="username" required')+fld('jn-phone','Phone','tel','autocomplete="tel"')+fld('jn-pw','Password (8+ characters)','password','autocomplete="new-password" minlength="8" required')+'<p class="err" id="auth-err" role="alert"></p><button class="btn primary block" type="submit">Join the team</button></form>';
+}
+function authError(m){const e=$('#auth-err');if(e)e.textContent=m}
+async function formSubmit(name,form){
+  const btn=form.querySelector('button[type=submit]');if(btn)btn.disabled=true;
+  const v=id=>($('#'+id)||{value:''}).value;
+  try{
+    if(name==='login'){await signIn(v('li-email'),v('li-pw'))}
+    else if(name==='signup'){
+      const a=await createAccount({name:v('su-name'),email:v('su-email'),phone:v('su-phone'),password:v('su-pw'),role:'customer'});
+      await pushMessage(a.id,a.name,'Hi '+a.name.split(' ')[0]+'! Welcome to Bish Cleanup. We handle property upkeep and handyman work in Lewis, Cowlitz, Clark and Thurston counties. Request a quote any time and we will confirm a price and time.',true);
+      await signIn(a.email,v('su-pw'));
+    }
+    else if(name==='setup'){
+      const a=await createAccount({name:v('st-name'),email:v('st-email'),phone:v('st-phone'),password:v('st-pw'),role:'admin'});
+      if(v('st-phone').trim())await w(()=>S.db.doc('settings/main').set(Object.assign({},S.settings,{phone:v('st-phone').trim()})));
+      await signIn(a.email,v('st-pw'));
+    }
+    else if(name==='join'){
+      const iv=await S.db.doc('invites/'+S.joinToken).get();if(!iv.exists)throw {code:'noinvite'};
+      const a=await createAccount({name:v('jn-name'),email:v('jn-email'),phone:v('jn-phone'),password:v('jn-pw'),role:'team'});
+      history.replaceState&&0;S.joinToken=null;try{location.hash=''}catch(e){}
+      await signIn(a.email,v('jn-pw'));
+    }
+  }catch(e){
+    if(e&&e.code==='noinvite')authError('This signup link is no longer active.');else authError(authErr(e));
+    if(btn)btn.disabled=false;
+  }
+}
+
+/* ---------- shell ---------- */
+function navFor(){
+  if(!S.me)return [];
+  if(isStaff())return [['bookings','Bookings','calendar'],['schedule','Schedule','list'],['clock','Clock','clock'],['messages','Messages','chat'],['alerts','Alerts','bell'],['profile','Profile','user']];
+  return [['bookings','Bookings','calendar'],['messages','Messages','chat'],['alerts','Alerts','bell'],['profile','Profile','user']];
+}
+function renderShell(){
+  $('#app').innerHTML='<header class="top"><div class="top-in"><button class="brand" data-action="go" data-view="bookings" aria-label="Bish Cleanup home"><svg class="mark"><use href="#mark"/></svg><span class="wm">Bish<em>Cleanup</em></span></button><div class="top-r"><button class="icon-btn" id="themeBtn" data-action="theme-toggle" aria-label="Switch light or dark theme"></button><button class="avatar-btn" id="hdrAv" data-action="go" data-view="profile" aria-label="Profile"></button></div></div></header><main id="view"></main><nav class="nav" aria-label="Main"><div class="nav-in" id="nav"></div></nav>';
+  updateChrome();renderView();
+}
+function unreadCount(){return S.alerts.filter(a=>a.ts>S.seenAlerts&&a.ts>S.clearedBefore).length}
+function updateChrome(){
+  const tb=$('#themeBtn');if(tb)tb.innerHTML=ic(isDarkNow()?'sun':'moon');
+  const av=$('#hdrAv');if(av&&S.me)av.innerHTML=avatar(S.me,34);
+  const nav=$('#nav');if(!nav)return;
+  const un=S.view==='alerts'?0:unreadCount();
+  nav.innerHTML=navFor().map(n=>'<button class="'+(S.view===n[0]||(n[0]==='profile'&&S.view==='team')?'on':'')+'" data-action="go" data-view="'+n[0]+'" aria-label="'+n[1]+'">'+ic(n[2])+'<span>'+n[1]+'</span>'+(n[0]==='alerts'&&un?'<i class="badge">'+(un>9?'9+':un)+'</i>':'')+'</button>').join('');
+}
+function go(v){
+  if(S.view==='alerts'&&v!=='alerts')markSeen();
+  S.view=v;if(v!=='messages')S.thread=isStaff()?null:S.thread;
+  if(v==='alerts')markSeen();
+  closeModal(true);renderView();updateChrome();window.scrollTo(0,0);
+}
+function markSeen(){S.seenAlerts=Date.now();ls.set('bish.seen.'+S.me.id,String(S.seenAlerts))}
+
+function renderView(){
+  const el=$('#view');if(!el||!S.me)return;
+  const map={bookings:viewBookings,schedule:viewSchedule,clock:viewClock,messages:viewMessages,alerts:viewAlerts,profile:viewProfile,team:viewTeam};
+  if(S.view==='team'&&!isAdmin())S.view='profile';
+  if(!isStaff()&&(S.view==='schedule'||S.view==='clock'))S.view='bookings';
+  let html='';try{html=(map[S.view]||viewBookings)()}catch(e){console.error(e);html='<div class="card">Something went wrong drawing this page.</div>'}
+  const banner=S.revoked?'<div class="note warn">'+ic('x')+'<span>Your access to this page changed. Reload to continue.</span></div>':S.slow?'<div class="note warn">'+ic('clock')+'<span>Cannot reach the data store yet. What you see may be out of date.</span></div>':'';
+  el.innerHTML=banner+html;
+  if(S.view==='messages'&&S.thread)stickChat();
+}
+
+/* ---------- bookings view ---------- */
+function emptyState(t,p,icon){return '<div class="empty card flat"><div class="dot">'+ic(icon||'calendar')+'</div><h3>'+t+'</h3><p>'+p+'</p></div>'}
+function reminderBanner(){
+  const now=Date.now();
+  const b=S.bookings.filter(b=>b.status==='scheduled'&&b.slotTs>now&&b.slotTs-now<=3600000&&(isAdmin()||b.assigneeId===S.me.id||b.customerId===S.me.id)&&!S.dismissed[b.id+':'+b.slotTs]).sort((a,c)=>a.slotTs-c.slotTs)[0];
+  if(!b)return '';
+  const m=Math.max(1,Math.round((b.slotTs-now)/60000));
+  return '<div class="note warn" role="status">'+ic('bell')+'<div class="grow"><b>Starts in '+m+' min</b><br>'+esc(b.service)+' · '+esc(isStaff()?b.customerName:'with '+(b.tag||'our team'))+' · '+esc(b.address)+'</div><button class="icon-btn" style="width:30px;height:30px" data-action="dismiss-rem" data-key="'+esc(b.id+':'+b.slotTs)+'" aria-label="Dismiss">'+ic('x')+'</button></div>';
+}
+function visibleBookings(){
+  let l=S.bookings.slice();
+  if(S.filter!=='all')l=l.filter(b=>b.status===S.filter);
+  if(S.selDay)l=l.filter(b=>dayKey(b.slotTs)===S.selDay);
+  l.sort((a,b)=>S.filter==='new'?(b.createdAt||0)-(a.createdAt||0):a.slotTs-b.slotTs);
+  return l;
+}
+function viewBookings(){
+  const staff=isStaff();
+  const cnt=s=>S.bookings.filter(b=>b.status===s).length;
+  const chips=[['new','New'],['quoted','Quoted'],['scheduled','Scheduled'],['all','All']].map(c=>'<button class="chip '+(S.filter===c[0]?'on':'')+'" data-action="filter" data-f="'+c[0]+'">'+c[1]+(c[0]!=='all'?' <b>'+cnt(c[0])+'</b>':'')+'</button>').join('');
+  const list=visibleBookings();
+  const phone=S.settings.phone;
+  return reminderBanner()+
+    '<div class="vh"><div><p class="eyebrow">'+(S.me.role==='admin'?'Admin dashboard':S.me.role==='team'?'Team dashboard':'Hi, '+esc(S.me.name.split(' ')[0]))+'</p><h1>'+(staff?'Quotes &amp; bookings':'Your requests')+'</h1></div><button class="btn primary" data-action="new-request">'+ic('plus')+'<span>'+(staff?'New booking':'Request a quote')+'</span></button></div>'+
+    '<div class="chips" role="tablist" aria-label="Status">'+chips+'</div>'+
+    (staff?calendarHTML():'')+
+    (S.selDay?'<div class="row"><span class="pill work">'+esc(fmtDate(new Date(S.selDay+'T12:00:00').getTime()))+'</span><button class="btn sm" data-action="clear-day">Show all days</button></div>':'')+
+    '<div class="stack">'+(list.length?list.map(bookingCard).join(''):emptyState('Nothing here yet',staff?'New requests from customers will appear here.':'Request a quote and we will confirm a price and time.'))+'</div>'+
+    (!staff?'<div class="card flat"><h3>Need to cancel or reschedule?</h3><p class="sub">Call the office and we will update your booking right away.</p>'+officeContact()+'</div>':'');
+}
+function officeContact(){
+  const p=S.settings.phone;
+  if(!p)return '<div class="row" style="margin-top:10px"><button class="btn" data-action="go" data-view="messages">'+ic('chat')+'<span>Message the team</span></button></div>';
+  return '<div class="row" style="margin-top:12px"><a class="btn primary" href="tel:'+esc(p)+'" data-action="noop">'+ic('phone')+'<span>Call</span></a><a class="btn" href="sms:'+esc(p)+'" data-action="noop">'+ic('text')+'<span>Text</span></a><span class="tnum" style="font-weight:700;user-select:all">'+esc(p)+'</span></div>';
+}
+function calendarHTML(){
+  const now=new Date();if(!S.cal)S.cal={y:now.getFullYear(),m:now.getMonth()};
+  const y=S.cal.y,m=S.cal.m,first=new Date(y,m,1),dim=new Date(y,m+1,0).getDate();
+  const has={};S.bookings.forEach(b=>{if(b.status!=='cancelled')has[dayKey(b.slotTs)]=1});
+  const tk=dayKey(Date.now());
+  let cells='';for(let i=0;i<first.getDay();i++)cells+='<span></span>';
+  for(let d=1;d<=dim;d++){const k=y+'-'+pad(m+1)+'-'+pad(d);cells+='<button class="'+[k===tk?'today':'',k===S.selDay?'sel':'',has[k]?'has':''].join(' ')+'" data-action="pick-day" data-day="'+k+'" aria-label="'+k+(has[k]?', has bookings':'')+'">'+d+'</button>'}
+  return '<div class="card"><div class="cal-h"><button class="icon-btn" data-action="cal-nav" data-d="-1" aria-label="Previous month">'+ic('back')+'</button><h3>'+first.toLocaleDateString([],{month:'long',year:'numeric'})+'</h3><button class="icon-btn" data-action="cal-nav" data-d="1" aria-label="Next month">'+ic('chev')+'</button></div><div class="cal">'+'SMTWTFS'.split('').map(c=>'<span class="dw">'+c+'</span>').join('')+cells+'</div></div>';
+}
+function bookingCard(b){
+  const staff=isStaff(),phone=staff?b.phone:S.settings.phone;
+  return '<article class="card bk '+(b.status==='cancelled'?'dim':'')+'" data-action="open-booking" data-id="'+esc(b.id)+'" tabindex="0" role="button">'+
+    '<div class="bk-top"><div><h3>'+esc(b.service)+'</h3><p class="kind">WALKTHROUGH</p></div><div class="bk-r">'+chip(b.status)+(b.price>0?'<span class="price">'+money(b.price)+'</span>':'')+'</div></div>'+
+    '<p class="slot">'+ic('clock')+esc(fmtSlot(b.slotTs))+(b.movedFrom?'<em>Moved from '+esc(fmtSlot(b.movedFrom))+'</em>':'')+'</p>'+
+    '<dl class="kv">'+(staff?'<dt>Customer</dt><dd>'+esc(b.customerName)+'</dd>':'')+'<dt>Address</dt><dd>'+esc(b.address)+'</dd>'+(b.tag?'<dt>Name tag</dt><dd>'+esc(b.tag)+'</dd>':'')+'</dl>'+
+    (b.photos&&b.photos.length?'<div class="thumbs">'+b.photos.map(p=>'<img src="'+esc(p)+'" alt="Job photo">').join('')+'</div>':'')+
+    (phone&&b.status!=='cancelled'?'<div class="row"><a class="btn sm" href="tel:'+esc(phone)+'" data-action="noop">'+ic('phone')+'<span>Call</span></a><a class="btn sm" href="sms:'+esc(phone)+'" data-action="noop">'+ic('text')+'<span>Text</span></a></div>':'')+
+  '</article>';
+}
+function kvRow(k,v){return v?'<dt>'+k+'</dt><dd>'+v+'</dd>':''}
+function openBooking(id){
+  const b=S.bookings.find(x=>x.id===id);if(!b)return;
+  const staff=isStaff(),phone=staff?b.phone:S.settings.phone;
+  const mapUrl='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(b.address+(b.county?', '+b.county+' County, WA':''));
+  openModal(
+    '<div class="sh-head"><div><h2>'+esc(b.service)+'</h2><p class="kind">WALKTHROUGH</p></div><div class="row">'+chip(b.status)+'<button class="icon-btn" data-action="close-modal" aria-label="Close">'+ic('x')+'</button></div></div>'+
+    '<p class="slot big">'+ic('clock')+esc(fmtSlot(b.slotTs))+'</p>'+
+    (b.movedFrom?'<div class="note">'+ic('clock')+'<span>Moved from '+esc(fmtSlot(b.movedFrom))+'</span></div>':'')+
+    (b.notes?'<div class="note">'+ic('note')+'<span>'+esc(b.notes)+'</span></div>':'')+
+    '<dl class="kv">'+
+      kvRow('Customer',staff?esc(b.customerName)+'<br><span style="font-weight:500;color:var(--muted)">'+esc(b.email||'')+'</span>':'')+
+      kvRow('Phone',staff&&b.phone?'<span style="user-select:all">'+esc(b.phone)+'</span>':'')+
+      kvRow('Property',esc(b.property))+kvRow('Frequency',esc(b.frequency))+kvRow('Timing',esc(b.timing))+
+      kvRow('County',b.county?esc(b.county)+' County':'')+kvRow('Requester',esc(b.requester))+
+      kvRow('Address',esc(b.address)+' <a href="'+mapUrl+'" target="_blank" rel="noopener">Map</a>')+
+      kvRow('Name tag',esc(b.tag))+kvRow('Price',b.price>0?money(b.price):'')+
+    '</dl>'+
+    (b.photos&&b.photos.length?'<div class="thumbs">'+b.photos.map(p=>'<img src="'+esc(p)+'" alt="Job photo" data-action="photo">').join('')+'</div>':'')+
+    (phone?'<div class="row"><a class="btn" href="tel:'+esc(phone)+'" data-action="noop">'+ic('phone')+'<span>Call</span></a><a class="btn" href="sms:'+esc(phone)+'" data-action="noop">'+ic('text')+'<span>Text</span></a>'+(staff?'':'<span class="tnum" style="font-weight:700;user-select:all">'+esc(phone)+'</span>')+'</div>':'')+
+    (staff?
+      (b.status!=='cancelled'?'<button class="btn primary block" data-action="price-modal" data-id="'+esc(b.id)+'">'+ic('check')+'<span>Update price / stage</span></button><button class="btn block" data-action="slot-modal" data-id="'+esc(b.id)+'">'+ic('clock')+'<span>Adjust time slot</span></button>':'')+
+      '<button class="btn block" data-action="open-thread" data-id="'+esc(b.customerId)+'" data-name="'+esc(b.customerName)+'">'+ic('chat')+'<span>Message customer</span></button>'+
+      (b.status!=='cancelled'?'<button class="btn danger block" data-action="cancel-modal" data-id="'+esc(b.id)+'">Cancel request</button>':'')
+    :
+      '<div class="note">'+ic('phone')+'<span>To cancel or reschedule, call the office. We update your booking right away.</span></div><button class="btn block" data-action="open-thread" data-id="'+esc(b.customerId)+'" data-name="'+esc(b.customerName)+'">'+ic('chat')+'<span>Message the team</span></button>')
+  );
+}
+
+/* ---------- slot picker ---------- */
+function slotDefault(ts){const d=ts?new Date(ts):new Date();const day=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();return {day:day,hour:ts?d.getHours():null}}
+function slotTs(){if(M.slot.hour==null)return null;const t=new Date(M.slot.day);t.setHours(M.slot.hour,0,0,0);return t.getTime()}
+function slotHTML(){
+  const base=new Date();base.setHours(0,0,0,0);const days=[];
+  for(let i=0;i<21;i++){const d=new Date(base);d.setDate(base.getDate()+i);days.push(d)}
+  if(M.slot.day>days[days.length-1].getTime()||M.slot.day<days[0].getTime())days.unshift(new Date(M.slot.day));
+  const dchips=days.map(d=>'<button type="button" class="chip '+(d.getTime()===M.slot.day?'on':'')+'" data-action="slot-day" data-ts="'+d.getTime()+'"><span>'+d.toLocaleDateString([],{weekday:'short'})+'</span><b>'+d.getDate()+'</b></button>').join('');
+  const tchips=HOURS.map(h=>{const t=new Date(M.slot.day);t.setHours(h,0,0,0);const past=t.getTime()<Date.now()+1800000&&!(M.allowPast);return '<button type="button" class="chip '+(M.slot.hour===h?'on':'')+'" data-action="slot-hour" data-h="'+h+'" '+(past?'disabled':'')+'>'+t.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'</button>'}).join('');
+  return '<div class="lbl">Day</div><div class="chips">'+dchips+'</div><div class="lbl" style="margin-top:8px">Time slot</div><div class="chips" style="flex-wrap:wrap">'+tchips+'</div>';
+}
+function redrawSlot(){const b=$('#slotbox');if(b)b.innerHTML=slotHTML()}
+
+/* ---------- new request ---------- */
+function opts(arr,sel){return arr.map(o=>'<option'+(o===sel?' selected':'')+'>'+esc(o)+'</option>').join('')}
+function openRequest(){
+  const staff=isStaff();
+  M={};openModal(
+    '<div class="sh-head"><h2>'+(staff?'New booking':'Request a quote')+'</h2><button class="icon-btn" data-action="close-modal" aria-label="Close">'+ic('x')+'</button></div>'+
+    '<form class="form" data-form="request">'+
+    (staff?fld('rq-name','Customer full name','text','required')+'<div class="two">'+fld('rq-email','Customer email','email','placeholder="Optional"')+fld('rq-phone','Customer phone','tel','required placeholder="(360) 555-0100"')+'</div>'
+          :fld('rq-phone','Phone for alerts','tel','required value="'+esc(S.me.phone||'')+'" placeholder="(360) 555-0100"'))+
+    '<div class="two"><label class="field"><span>Service</span><select id="rq-service">'+opts(SERVICES)+'</select></label><label class="field"><span>Property</span><select id="rq-property">'+opts(PROPS)+'</select></label></div>'+
+    '<div class="two"><label class="field"><span>Frequency</span><select id="rq-frequency">'+opts(FREQ)+'</select></label><label class="field"><span>How soon</span><select id="rq-timing">'+opts(TIMING)+'</select></label></div>'+
+    '<div class="two"><label class="field"><span>County</span><select id="rq-county">'+opts(COUNTIES)+'</select></label>'+fld('rq-address','Property address','text','required placeholder="12 Main St"')+'</div>'+
+    '<div id="slotbox" class="stack" style="gap:6px"></div>'+
+    '<label class="field"><span>Notes and access info</span><textarea id="rq-notes" placeholder="Pets, gate codes, what needs doing"></textarea></label>'+
+    '<div class="field"><span>Photos (optional, up to 3)</span><input id="rq-photos" type="file" accept="image/*" multiple data-change="photos"><div class="thumbs" id="photoprev"></div></div>'+
+    '<p class="err" id="rq-err" role="alert"></p><button class="btn primary block" type="submit">'+(staff?'Create booking':'Submit request')+'</button></form>',
+    {slot:slotDefault(),photos:[]}
+  );
+  redrawSlot();
+}
+function drawPhotos(){
+  const p=$('#photoprev');if(!p)return;
+  p.innerHTML=M.photos.map((s,i)=>'<span class="rm"><img src="'+esc(s)+'" alt="Photo '+(i+1)+'"><button type="button" data-action="rm-photo" data-i="'+i+'" aria-label="Remove photo">'+ic('x')+'</button></span>').join('');
+}
+async function addPhotos(input){
+  const files=Array.from(input.files||[]);
+  for(const f of files){if(M.photos.length>=3){toast('Up to 3 photos per request.','err');break}
+    try{M.photos.push(await shrink(f,720,.65,false,60000))}catch(e){toast("Couldn't read that photo.",'err')}}
+  input.value='';drawPhotos();
+}
+async function submitRequest(form){
+  const v=id=>($('#'+id)||{value:''}).value.trim(),staff=isStaff(),err=m=>{$('#rq-err').textContent=m};
+  const ts=slotTs();if(ts==null){err('Pick a day and a time slot.');return}
+  const name=staff?v('rq-name'):S.me.name,email=staff?v('rq-email').toLowerCase():S.me.email;
+  if(!name){err('Enter the customer name.');return}
+  const btn=form.querySelector('button[type=submit]');btn.disabled=true;
+  const cid=staff?(email?emailKey(email):'walkin-'+rid()):S.me.id;
+  const ref=S.db.collection('bookings').doc();
+  const b={customerId:cid,customerName:name,email:email,phone:v('rq-phone'),service:v('rq-service'),property:v('rq-property'),frequency:v('rq-frequency'),timing:v('rq-timing'),county:v('rq-county'),address:v('rq-address'),notes:v('rq-notes'),photos:M.photos.slice(),slotTs:ts,movedFrom:null,status:'new',price:0,tag:'',assigneeId:'',requester:staff?'Staff · '+S.me.tag:'Customer',createdAt:Date.now(),remindedSlot:null};
+  try{
+    await w(()=>ref.set(b));
+    if(!staff&&b.phone&&b.phone!==S.me.phone)S.db.doc('accounts/'+S.me.id).update({phone:b.phone}).catch(()=>{});
+    await pushAlert('staff','New quote request',name+' · '+b.service+' · '+fmtSlot(ts),'new',ref.id);
+    closeModal(true);toast(staff?'Booking created.':'Request sent. We will confirm a price soon.');
+    S.filter='new';scheduleRender();
+  }catch(e){err(errMsg(e));btn.disabled=false}
+}
+
+/* ---------- price / stage / slot / cancel ---------- */
+function staffOptions(sel){
+  const list=S.accounts.filter(a=>a.role==='admin'||a.role==='team');
+  return list.map(a=>'<option value="'+esc(a.id)+'"'+(a.id===sel?' selected':'')+'>'+esc(a.tag||tagFromName(a.name))+' ('+esc(a.name)+')</option>').join('');
+}
+function openPrice(id){
+  const b=S.bookings.find(x=>x.id===id);if(!b)return;
+  const sel=b.assigneeId||S.me.id;
+  openModal(
+    '<div class="sh-head"><h2>Confirm price and stage</h2><button class="icon-btn" data-action="close-modal" aria-label="Close">'+ic('x')+'</button></div>'+
+    '<p class="sub">'+esc(b.service)+' for '+esc(b.customerName)+' · '+esc(fmtSlot(b.slotTs))+'</p>'+
+    '<form class="form" data-form="price" data-id="'+esc(id)+'">'+
+    fld('pr-price','Price (USD)','number','step="0.01" min="0" inputmode="decimal" placeholder="150.00" value="'+(b.price>0?b.price:'')+'"')+
+    '<label class="field"><span>Status stage</span><select id="pr-stage"><option value="new"'+(b.status==='new'?' selected':'')+'>New</option><option value="quoted"'+(b.status==='quoted'?' selected':'')+'>Quoted (price sent)</option><option value="scheduled"'+(b.status==='scheduled'?' selected':'')+'>Scheduled (confirmed)</option></select></label>'+
+    '<label class="field"><span>Name tag on the confirmation</span><select id="pr-who" '+(isAdmin()?'':'disabled')+'>'+staffOptions(sel)+'</select></label>'+
+    '<p class="sub" style="margin-top:-6px">'+(isAdmin()?'Pick whose name tag the customer sees. The job goes on that person\'s schedule.':'The customer sees your name tag.')+'</p>'+
+    '<p class="err" id="pr-err" role="alert"></p><button class="btn primary block" type="submit">Confirm &amp; send customer alert</button></form>'
+  );
+}
+function conflictFor(b,tag,ts){
+  return S.bookings.find(o=>o.id!==b.id&&o.status==='scheduled'&&o.tag===tag&&Math.abs(o.slotTs-ts)<SLOT_MS);
+}
+async function savePrice(form){
+  const id=form.dataset.id,b=S.bookings.find(x=>x.id===id),err=m=>{$('#pr-err').textContent=m};if(!b)return;
+  const stage=$('#pr-stage').value,price=parseFloat($('#pr-price').value),whoId=isAdmin()?$('#pr-who').value:S.me.id;
+  if(stage!=='new'&&!(price>=0)){err('Enter a price before sending a quote or confirming.');return}
+  const who=S.accounts.find(a=>a.id===whoId)||S.me,tag=who.tag||tagFromName(who.name);
+  if(stage==='scheduled'){const c=conflictFor(b,tag,b.slotTs);if(c){err(tag+' already has a scheduled job for '+c.customerName+' at '+fmtSlot(c.slotTs)+'. Pick another name tag or adjust the time slot.');return}}
+  const btn=form.querySelector('button[type=submit]');btn.disabled=true;
+  const p=isNaN(price)?0:price;
+  try{
+    await w(()=>S.db.doc('bookings/'+id).update({price:p,status:stage,tag:tag,assigneeId:whoId,confirmedAt:Date.now()}));
+    if(stage!=='new'){
+      const what=stage==='scheduled'?'booking':'quote',line=tag+' confirmed your '+b.service+' '+what+' — '+money(p);
+      await pushAlert('u:'+b.customerId,stage==='scheduled'?'Booking confirmed':'Your quote is ready',line+' · '+fmtSlot(b.slotTs),'confirm',id);
+      await pushAlert('staff',stage==='scheduled'?'Booking confirmed':'Quote sent',b.customerName+' · '+b.service+' · '+money(p)+' · '+tag,'confirm',id);
+      await pushMessage(b.customerId,b.customerName,line+'. '+fmtSlot(b.slotTs)+'.',false);
+    }
+    closeModal(true);toast('Saved'+(stage!=='new'?' and customer alerted.':'.'));
+  }catch(e){err(errMsg(e));btn.disabled=false}
+}
+function openSlot(id){
+  const b=S.bookings.find(x=>x.id===id);if(!b)return;
+  M={};openModal(
+    '<div class="sh-head"><h2>Adjust time slot</h2><button class="icon-btn" data-action="close-modal" aria-label="Close">'+ic('x')+'</button></div>'+
+    '<p class="sub">Currently '+esc(fmtSlot(b.slotTs))+' for '+esc(b.customerName)+'. Use this after a customer calls to reschedule.</p>'+
+    '<form class="form" data-form="slot" data-id="'+esc(id)+'"><div id="slotbox" class="stack" style="gap:6px"></div><p class="err" id="sl-err" role="alert"></p><button class="btn primary block" type="submit">Move booking and alert customer</button></form>',
+    {slot:slotDefault(b.slotTs),allowPast:false}
+  );
+  redrawSlot();
+}
+async function saveSlot(form){
+  const id=form.dataset.id,b=S.bookings.find(x=>x.id===id),err=m=>{$('#sl-err').textContent=m};if(!b)return;
+  const ts=slotTs();if(ts==null){err('Pick a time slot.');return}
+  if(ts===b.slotTs){err('That is already the current slot.');return}
+  if(b.status==='scheduled'&&b.tag){const c=conflictFor(b,b.tag,ts);if(c){err(b.tag+' already has a scheduled job for '+c.customerName+' at '+fmtSlot(c.slotTs)+'.');return}}
+  const btn=form.querySelector('button[type=submit]');btn.disabled=true;
+  try{
+    await w(()=>S.db.doc('bookings/'+id).update({slotTs:ts,movedFrom:b.slotTs,remindedSlot:null}));
+    const line='Your '+b.service+' walkthrough has been moved to '+fmtSlot(ts)+'.';
+    await pushAlert('u:'+b.customerId,'Booking moved',line,'moved',id);
+    if(b.assigneeId&&b.assigneeId!==S.me.id)await pushAlert('u:'+b.assigneeId,'Booking moved',b.customerName+' · now '+fmtSlot(ts),'moved',id);
+    await pushMessage(b.customerId,b.customerName,line,false);
+    closeModal(true);toast('Time slot updated.');
+  }catch(e){err(errMsg(e));btn.disabled=false}
+}
+function openCancel(id){
+  const b=S.bookings.find(x=>x.id===id);if(!b)return;
+  openModal('<div class="sh-head"><h2>Cancel this request?</h2><button class="icon-btn" data-action="close-modal" aria-label="Close">'+ic('x')+'</button></div><p>'+esc(b.service)+' for '+esc(b.customerName)+' on '+esc(fmtSlot(b.slotTs))+' will be marked cancelled and the customer will be alerted.</p><button class="btn danger block" data-action="do-cancel" data-id="'+esc(id)+'">Yes, cancel it</button><button class="btn block" data-action="close-modal">Keep it</button>');
+}
+async function doCancel(id){
+  const b=S.bookings.find(x=>x.id===id);if(!b)return;
+  try{
+    await w(()=>S.db.doc('bookings/'+id).update({status:'cancelled',cancelledBy:S.me.tag||S.me.name,cancelledAt:Date.now()}));
+    const line='Your '+b.service+' walkthrough on '+fmtSlot(b.slotTs)+' was cancelled by '+(S.me.tag||'our team')+'.';
+    await pushAlert('u:'+b.customerId,'Booking cancelled',line,'cancel',id);
+    await pushAlert('staff','Booking cancelled',b.customerName+' · '+b.service+' · '+fmtSlot(b.slotTs),'cancel',id);
+    await pushMessage(b.customerId,b.customerName,line,false);
+    closeModal(true);toast('Request cancelled.');
+  }catch(e){toast(errMsg(e),'err')}
+}
+
+/* ---------- schedule ---------- */
+function viewSchedule(){
+  const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  let l=S.bookings.filter(b=>b.status==='scheduled'&&b.slotTs>=start);
+  if(S.mineOnly)l=l.filter(b=>b.assigneeId===S.me.id);
+  l.sort((a,b)=>a.slotTs-b.slotTs);
+  const tk=dayKey(Date.now()),today=l.filter(b=>dayKey(b.slotTs)===tk).length;
+  const waiting=S.bookings.filter(b=>b.status==='new').length;
+  const groups={};l.forEach(b=>{(groups[dayKey(b.slotTs)]=groups[dayKey(b.slotTs)]||[]).push(b)});
+  const keys=Object.keys(groups).sort();
+  const body=keys.length?keys.map(k=>{
+    const lab=k===tk?'Today':fmtDate(groups[k][0].slotTs);
+    return '<div class="stack"><h3 style="margin-top:6px">'+lab+' <span class="sub" style="font-family:var(--font-body);font-weight:500">· '+groups[k].length+' visit'+(groups[k].length>1?'s':'')+'</span></h3>'+groups[k].map(schedCard).join('')+'</div>';
+  }).join(''):emptyState('No scheduled visits','Confirmed bookings show up here with today first.','list');
+  return reminderBanner()+'<div class="vh"><div><p class="eyebrow">Dispatch</p><h1>Daily team schedule</h1><p class="sub">Today first. One tap to call or text.</p></div><span class="pill work"><i></i>1-hour reminders on</span></div>'+
+    '<div class="card flat row" style="justify-content:space-between"><div><b>'+today+' visit'+(today===1?'':'s')+' today</b><p class="sub">'+(waiting?waiting+' new request'+(waiting>1?'s':'')+' waiting for a price':'No requests waiting for a price')+'</p></div><div class="seg" style="min-width:190px"><button class="'+(!S.mineOnly?'on':'')+'" data-action="mine" data-v="0">All jobs</button><button class="'+(S.mineOnly?'on':'')+'" data-action="mine" data-v="1">My jobs</button></div></div>'+body;
+}
+function schedCard(b){
+  const q=encodeURIComponent(b.address+(b.county?', '+b.county+' County, WA':''));
+  return '<article class="card bk" data-action="open-booking" data-id="'+esc(b.id)+'" tabindex="0" role="button"><div class="bk-top"><div><h3>'+esc(b.service)+'</h3><p class="sub">'+esc(b.customerName)+' · '+esc(b.address)+'</p></div><div class="bk-r"><span class="price" style="font-size:18px">'+esc(fmtTime(b.slotTs))+'</span><span class="st st-scheduled">'+esc(b.tag||'Unassigned')+'</span></div></div>'+
+   (b.notes?'<div class="note">'+ic('note')+'<span>'+esc(b.notes)+'</span></div>':'')+
+   '<div class="row"><a class="btn sm" href="tel:'+esc(b.phone)+'" data-action="noop">'+ic('phone')+'<span>Call</span></a><a class="btn sm" href="sms:'+esc(b.phone)+'" data-action="noop">'+ic('text')+'<span>Text</span></a><a class="btn sm" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" rel="noopener" data-action="noop">'+ic('pin')+'<span>Map</span></a><span class="grow"></span><b class="tnum">'+(b.price>0?money(b.price):'')+'</b></div></article>';
+}
+
+/* ---------- time clock ---------- */
+function myEvents(){return S.logs.filter(l=>l.userId===S.me.id)}
+function myState(){
+  const ev=myEvents().sort((a,b)=>a.ts-b.ts),last=ev[ev.length-1];
+  if(!last||last.type==='out')return 'out';
+  if(last.type==='lunch_start')return 'lunch';
+  if(last.type==='break_start')return 'break';
+  return 'work';
+}
+function openShift(){const s=computeShifts(myEvents(),Date.now());const o=s[s.length-1];return o&&o.open?o:null}
+function viewClock(){
+  const st=myState(),sh=openShift();
+  const label={out:'Clocked out',work:'Clocked in',lunch:'On lunch',break:'On a break'}[st];
+  const btns={
+    out:[['clock-in','Clock in','primary','clock']],
+    work:[['lunch_start','Lunch out','','clock'],['break_start','Short break','','clock'],['out','Clock out','danger','logout']],
+    lunch:[['lunch_end','Back from lunch','primary','check'],['out','Clock out','danger','logout']],
+    break:[['break_end','End break','primary','check'],['out','Clock out','danger','logout']]
+  }[st].map(b=>'<button class="btn '+b[2]+'" data-action="clock" data-type="'+(b[0]==='clock-in'?'in':b[0])+'">'+ic(b[3])+'<span>'+b[1]+'</span></button>').join('');
+  return '<div class="vh"><div><p class="eyebrow">Hours</p><h1>Time clock</h1></div></div>'+
+   '<div class="card clock"><span class="pill '+(st==='out'?'':st)+'" id="clockPill"><i></i>'+label+'</span><div class="time" id="clockTime">'+hm2(sh?sh.paidMs:0)+'</div><p class="sub" id="clockSub">'+(sh?'Since '+fmtTime(sh.inTs)+' · lunch is unpaid':'Tap Clock in to start your shift')+'</p><div class="clock-btns">'+btns+'</div></div>'+
+   (isAdmin()?adminHours():myHours());
+}
+function hm2(ms){const s=Math.floor(Math.max(0,ms)/1000);return pad(Math.floor(s/3600))+':'+pad(Math.floor(s%3600/60))+':'+pad(s%60)}
+function tickClock(){
+  const t=$('#clockTime');if(!t||!S.me||S.view!=='clock')return;
+  const sh=openShift();t.textContent=hm2(sh?sh.paidMs:0);
+}
+async function clockAct(type){
+  if(S.busy)return;S.busy=true;
+  try{await w(()=>S.db.collection('timelogs').add({userId:S.me.id,name:S.me.name,tag:S.me.tag||'',type:type,ts:Date.now()}));
+    toast({in:'Clocked in.',out:'Clocked out.',lunch_start:'Lunch started.',lunch_end:'Back from lunch.',break_start:'Break started.',break_end:'Break ended.'}[type])}
+  catch(e){toast(errMsg(e),'err')}
+  S.busy=false;
+}
+function periodRange(){
+  const now=new Date(),sod=new Date(now.getFullYear(),now.getMonth(),now.getDate());let s,e,lab;
+  if(S.period==='lastweek'){e=new Date(sod);e.setDate(e.getDate()-e.getDay());s=new Date(e);s.setDate(s.getDate()-7);lab='Last week'}
+  else if(S.period==='month'){s=new Date(now.getFullYear(),now.getMonth(),1);e=new Date(now.getFullYear(),now.getMonth()+1,1);lab='This month'}
+  else if(S.period==='lastmonth'){s=new Date(now.getFullYear(),now.getMonth()-1,1);e=new Date(now.getFullYear(),now.getMonth(),1);lab='Last month'}
+  else if(S.period==='custom'&&S.cFrom&&S.cTo){const f=S.cFrom.split('-'),t=S.cTo.split('-');s=new Date(+f[0],+f[1]-1,+f[2]);e=new Date(+t[0],+t[1]-1,+t[2]+1);lab='Custom range'}
+  else{s=new Date(sod);s.setDate(s.getDate()-s.getDay());e=new Date(s);e.setDate(e.getDate()+7);lab='This week'}
+  return [s.getTime(),e.getTime(),lab];
+}
+function shiftsInPeriod(){
+  const r=periodRange(),by={};S.logs.forEach(l=>{(by[l.userId]=by[l.userId]||[]).push(l)});
+  let all=[];Object.keys(by).forEach(u=>{all=all.concat(computeShifts(by[u],Date.now()))});
+  return all.filter(s=>s.inTs>=r[0]&&s.inTs<r[1]).sort((a,b)=>b.inTs-a.inTs);
+}
+function shiftRow(s,withName,admin){
+  return '<tr>'+(withName?'<td><b>'+esc(s.name)+'</b></td>':'')+'<td>'+esc(fmtDate(s.inTs))+'</td><td>'+esc(fmtTime(s.inTs))+'</td><td>'+(s.open?'<span class="st st-scheduled">On shift</span>':esc(fmtTime(s.endTs)))+'</td><td class="num">'+Math.round(s.lunchMs/60000)+' min</td><td class="num">'+Math.round(s.breakMs/60000)+' min</td><td class="num"><b>'+(s.paidMs/3600000).toFixed(2)+'</b></td>'+(admin?'<td>'+(s.open?'<button class="btn sm" data-action="close-shift" data-uid="'+esc(s.userId)+'" data-name="'+esc(s.name)+'">Clock out</button>':'')+'</td>':'')+'</tr>';
+}
+function myHours(){
+  const s=computeShifts(myEvents(),Date.now()).filter(x=>x.inTs>=periodRange()[0]&&x.inTs<periodRange()[1]).sort((a,b)=>b.inTs-a.inTs);
+  const tot=s.reduce((a,b)=>a+b.paidMs,0);
+  return '<div class="card stack"><div class="row" style="justify-content:space-between"><h3>Your hours · '+periodRange()[2].toLowerCase()+'</h3><b class="tnum">'+hm(tot)+'</b></div>'+(s.length?'<div class="tbl-wrap"><table><thead><tr><th>Date</th><th>In</th><th>Out</th><th class="num">Lunch</th><th class="num">Breaks</th><th class="num">Paid hrs</th></tr></thead><tbody>'+s.map(x=>shiftRow(x,false,false)).join('')+'</tbody></table></div>':'<p class="sub">No shifts yet this week.</p>')+'</div>';
+}
+function adminHours(){
+  const r=periodRange(),sh=shiftsInPeriod(),tot={};
+  sh.forEach(s=>{const t=tot[s.userId]=tot[s.userId]||{name:s.name,ms:0,n:0};t.ms+=s.paidMs;t.n++});
+  const names=Object.keys(tot).sort((a,b)=>tot[a].name.localeCompare(tot[b].name));
+  const f=k=>'<option value="'+k[0]+'"'+(S.period===k[0]?' selected':'')+'>'+k[1]+'</option>';
+  return '<div class="card stack"><div class="row" style="justify-content:space-between"><div><h3>Everyone\'s hours</h3><p class="sub">'+esc(new Date(r[0]).toLocaleDateString([],{month:'short',day:'numeric'}))+' to '+esc(new Date(r[1]-1).toLocaleDateString([],{month:'short',day:'numeric'}))+' · lunch unpaid, short breaks paid</p></div></div>'+
+   '<div class="two"><label class="field"><span>Pay period</span><select data-change="period">'+[['week','This week'],['lastweek','Last week'],['month','This month'],['lastmonth','Last month'],['custom','Custom range']].map(f).join('')+'</select></label>'+
+   (S.period==='custom'?'<div class="two"><label class="field"><span>From</span><input type="date" data-change="cfrom" value="'+esc(S.cFrom)+'"></label><label class="field"><span>To</span><input type="date" data-change="cto" value="'+esc(S.cTo)+'"></label></div>':'')+'</div>'+
+   (names.length?'<div class="tbl-wrap"><table style="min-width:360px"><thead><tr><th>Team member</th><th class="num">Shifts</th><th class="num">Paid hours</th></tr></thead><tbody>'+names.map(u=>'<tr><td><b>'+esc(tot[u].name)+'</b></td><td class="num">'+tot[u].n+'</td><td class="num"><b>'+(tot[u].ms/3600000).toFixed(2)+'</b></td></tr>').join('')+'</tbody></table></div>':'')+
+   (sh.length?'<div class="tbl-wrap"><table><thead><tr><th>Team member</th><th>Date</th><th>In</th><th>Out</th><th class="num">Lunch</th><th class="num">Breaks</th><th class="num">Paid hrs</th><th></th></tr></thead><tbody>'+sh.map(x=>shiftRow(x,true,true)).join('')+'</tbody></table></div>':'<p class="sub">No shifts in this period.</p>')+
+   '<div class="row"><button class="btn primary" data-action="export" data-kind="detail" '+(sh.length?'':'disabled')+'>'+ic('download')+'<span>Export shifts CSV</span></button><button class="btn" data-action="export" data-kind="totals" '+(sh.length?'':'disabled')+'>'+ic('download')+'<span>Export totals CSV</span></button></div></div>';
+}
+async function exportCsv(kind){
+  const sh=shiftsInPeriod().slice().sort((a,b)=>a.inTs-b.inTs),r=periodRange();let rows;
+  const dec=ms=>(ms/3600000).toFixed(2);
+  if(kind==='detail'){
+    rows=[['Team member','Email','Date','Clock in','Clock out','Lunch (min)','Breaks (min)','Paid hours']].concat(sh.map(s=>[s.name,s.userId,dayKey(s.inTs),fmtTime(s.inTs),s.open?'Still clocked in':fmtTime(s.endTs),Math.round(s.lunchMs/60000),Math.round(s.breakMs/60000),dec(s.paidMs)]));
+  }else{
+    const t={};sh.forEach(s=>{const x=t[s.userId]=t[s.userId]||{name:s.name,ms:0,n:0};x.ms+=s.paidMs;x.n++});
+    rows=[['Team member','Email','Shifts','Paid hours']].concat(Object.keys(t).sort().map(u=>[t[u].name,u,t[u].n,dec(t[u].ms)]));
+  }
+  const csv=rows.map(r=>r.map(csvCell).join(',')).join('\n');
+  const name='bish-cleanup-'+(kind==='detail'?'shifts':'totals')+'-'+dayKey(r[0])+'_to_'+dayKey(r[1]-1)+'.csv';
+  if(S.dl){try{await S.dl.save({filename:name,data:csv});toast('CSV ready.');return}catch(e){if(e&&e.code==='declined')return}}
+  openModal('<div class="sh-head"><h2>Copy the CSV</h2><button class="icon-btn" data-action="close-modal" aria-label="Close">'+ic('x')+'</button></div><p class="sub">Saving files is not available here. Copy this text into a file named '+esc(name)+'.</p><textarea id="csvbox" rows="10" readonly>'+esc(csv)+'</textarea><button class="btn primary block" data-action="copy-el" data-el="csvbox">'+ic('copy')+'<span>Copy</span></button>');
+}
+
+/* ---------- messages ---------- */
+function threads(){
+  const t={};
+  S.messages.forEach(m=>{const x=t[m.threadId]=t[m.threadId]||{id:m.threadId,name:m.threadName||'Customer',last:m};if(m.ts>=x.last.ts)x.last=m;if(m.threadName)x.name=m.threadName});
+  S.bookings.forEach(b=>{if(!t[b.customerId])t[b.customerId]={id:b.customerId,name:b.customerName,last:null}});
+  return Object.keys(t).map(k=>t[k]).filter(x=>x.last).sort((a,b)=>b.last.ts-a.last.ts);
+}
+function viewMessages(){
+  if(!isStaff()){S.thread=S.me.id}
+  if(S.thread)return threadView();
+  return '<div class="vh"><div><p class="eyebrow">Customers</p><h1>Inbox</h1></div></div><label class="field"><span class="sr">Search customers</span><div style="position:relative"><input data-input="msgq" placeholder="Search customers" value="'+esc(S.msgQ)+'" style="padding-left:40px"><span style="position:absolute;left:12px;top:11px;color:var(--muted)">'+ic('search')+'</span></div></label><div class="list card" id="threadlist">'+threadListHTML()+'</div>';
+}
+function threadListHTML(){
+  const q=S.msgQ.trim().toLowerCase(),l=threads().filter(t=>!q||t.name.toLowerCase().indexOf(q)>=0);
+  if(!l.length)return '<div class="empty"><div class="dot">'+ic('chat')+'</div><h3>No conversations yet</h3><p>Messages from customers and confirmations appear here.</p></div>';
+  return l.map(t=>'<div class="li click" data-action="open-thread" data-id="'+esc(t.id)+'" data-name="'+esc(t.name)+'" tabindex="0" role="button"><span class="av" style="width:42px;height:42px;font-size:17px">'+esc((t.name||'?')[0].toUpperCase())+'</span><div class="grow"><div class="row" style="justify-content:space-between;flex-wrap:nowrap"><h4>'+esc(t.name)+'</h4><small>'+esc(new Date(t.last.ts).toLocaleDateString([],{month:'short',day:'numeric'}))+'</small></div><p style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.last.text)+'</p></div></div>').join('');
+}
+function threadMsgs(){return S.messages.filter(m=>m.threadId===S.thread).sort((a,b)=>a.ts-b.ts)}
+function bubblesHTML(){
+  const l=threadMsgs();
+  if(!l.length)return '<div class="empty"><div class="dot">'+ic('chat')+'</div><h3>Start the conversation</h3><p>'+(isStaff()?'Send a note about this customer\'s booking.':'Ask a question or share details about your job.')+'</p></div>';
+  return l.map(m=>{
+    const mine=isStaff()?m.fromRole!=='customer':m.fromRole==='customer';
+    return '<div class="bub '+(mine?'me':'them')+'">'+esc(m.text)+'<small>'+(m.fromRole!=='customer'&&m.tag?esc(m.tag)+' · ':m.auto?'Bish Cleanup · ':'')+esc(fmtStamp(m.ts))+'</small></div>';
+  }).join('');
+}
+function threadView(){
+  const name=isStaff()?(threads().find(t=>t.id===S.thread)||{}).name||S.threadName||'Customer':'Bish Cleanup team';
+  return '<div class="row"><button class="icon-btn" data-action="thread-back" aria-label="Back" '+(isStaff()?'':'hidden')+'>'+ic('back')+'</button><div><p class="eyebrow">'+(isStaff()?'Conversation':'Messages')+'</p><h2>'+esc(name)+'</h2></div></div><div class="chat" id="msgs">'+bubblesHTML()+'</div><form class="compose" data-form="send"><input id="msg-in" placeholder="Write a message" autocomplete="off" aria-label="Message"><button class="btn primary" type="submit" aria-label="Send">'+ic('send')+'</button></form>';
+}
+function stickChat(){const m=$('#msgs');if(m&&m.lastElementChild)m.lastElementChild.scrollIntoView({block:'end'})}
+async function sendMsg(form){
+  const i=$('#msg-in'),t=i.value.trim();if(!t)return;i.value='';
+  const name=isStaff()?((threads().find(x=>x.id===S.thread)||{}).name||S.threadName||'Customer'):S.me.name;
+  try{await w(()=>S.db.collection('messages').add({threadId:S.thread,threadName:name,text:t,fromId:S.me.id,fromName:S.me.name,fromRole:S.me.role,tag:S.me.tag||'',ts:Date.now(),auto:false}));
+    if(!isStaff())await pushAlert('staff','New message',S.me.name+': '+t.slice(0,80),'msg');
+    else await pushAlert('u:'+S.thread,'New message from '+(S.me.tag||'Bish Cleanup'),t.slice(0,80),'msg');
+  }catch(e){toast(errMsg(e),'err');i.value=t}
+}
+
+/* ---------- alerts ---------- */
+function viewAlerts(){
+  const l=S.alerts.filter(a=>a.ts>S.clearedBefore).sort((a,b)=>b.ts-a.ts);
+  const seen=S.seenAlerts;
+  const icon={new:'calendar',confirm:'check',cancel:'x',reminder:'bell',moved:'clock',msg:'chat'};
+  return '<div class="vh"><div><p class="eyebrow">Live feed</p><h1>Alerts</h1></div>'+(l.length?'<button class="btn sm" data-action="clear-alerts">Clear all</button>':'')+'</div>'+
+   (l.length?'<div class="list card">'+l.map(a=>'<div class="li '+(a.bookingId?'click':'')+'" '+(a.bookingId?'data-action="open-booking" data-id="'+esc(a.bookingId)+'" tabindex="0" role="button"':'')+'><span class="ico '+(a.kind==='cancel'?'bad':'')+'">'+ic(icon[a.kind]||'bell')+'</span><div class="grow"><h4>'+esc(a.title)+'</h4><p>'+esc(a.detail)+'</p><small>'+esc(fmtStamp(a.ts))+'</small></div></div>').join('')+'</div>':emptyState('No alerts','New quote requests, confirmations and reminders show up here.','bell'));
+}
+
+/* ---------- profile ---------- */
+function viewProfile(){
+  const m=S.me,roleLab={admin:'Admin',team:'Team',customer:'Customer'}[m.role];
+  return '<div class="card row" style="gap:16px;flex-wrap:nowrap"><div style="position:relative">'+avatar(m,72)+'<label class="icon-btn" style="position:absolute;right:-6px;bottom:-6px;width:32px;height:32px;cursor:pointer" aria-label="Change profile picture">'+ic('camera')+'<input type="file" accept="image/*" class="sr" data-change="avatar"></label></div><div class="grow"><h2>'+esc(m.name)+'</h2><p class="sub" style="overflow-wrap:anywhere">'+esc(m.email)+'</p><span class="st st-scheduled" style="margin-top:6px">'+roleLab+(m.tag?' · '+esc(m.tag):'')+'</span></div></div>'+
+  '<div class="card stack"><h3>Appearance</h3><div class="seg" role="group" aria-label="Theme">'+['system','light','dark'].map(t=>'<button class="'+(S.theme===t?'on':'')+'" data-action="theme" data-t="'+t+'">'+t[0].toUpperCase()+t.slice(1)+'</button>').join('')+'</div></div>'+
+  '<form class="card form" data-form="name"><h3>Your name</h3>'+fld('pf-name','Full name','text','value="'+esc(m.name)+'" required')+fld('pf-tag','Name tag on confirmations','text','value="'+esc(m.tag||'')+'" maxlength="24"')+'<p class="sub" style="margin-top:-6px">Customers see this on confirmations, like John D.</p>'+fld('pf-phone','Phone','tel','value="'+esc(m.phone||'')+'"')+'<button class="btn primary block" type="submit">Save</button></form>'+
+  (isAdmin()?'<form class="card form" data-form="office"><h3>Office phone</h3><p class="sub">Customers call or text this number to cancel or reschedule.</p>'+fld('pf-office','Office phone','tel','value="'+esc(S.settings.phone||'')+'" placeholder="(360) 555-0100"')+'<button class="btn block" type="submit">Save office phone</button></form><div class="card list" style="padding:0"><div class="li click" data-action="go" data-view="team" tabindex="0" role="button"><span class="ico">'+ic('users')+'</span><div class="grow"><h4>Team members &amp; roles</h4><p>Add staff, change roles, manage signup links</p></div>'+ic('chev')+'</div></div>':'')+
+  '<form class="card form" data-form="pw"><h3>Change password</h3>'+fld('pw-cur','Current password','password','autocomplete="current-password" required')+fld('pw-new','New password (8+ characters)','password','autocomplete="new-password" minlength="8" required')+'<p class="err" id="pw-err" role="alert"></p><button class="btn block" type="submit">Update password</button></form>'+
+  '<button class="btn danger block" data-action="logout">'+ic('logout')+'<span>Log out</span></button>';
+}
+async function saveName(form){
+  const name=$('#pf-name').value.trim(),tag=($('#pf-tag').value.trim()||tagFromName(name)),phone=$('#pf-phone').value.trim();
+  if(!name){toast('Enter your name.','err');return}
+  try{await w(()=>S.db.doc('accounts/'+S.me.id).update({name:name,tag:tag,phone:phone}));toast('Saved.')}catch(e){toast(errMsg(e),'err')}
+}
+async function savePw(form){
+  const e=m=>{$('#pw-err').textContent=m},cur=$('#pw-cur').value,nw=$('#pw-new').value;
+  if(nw.length<8){e('Use at least 8 characters.');return}
+  try{
+    if(await hashPw(cur,S.me.salt)!==S.me.hash){e('Current password is not right.');return}
+    const salt=newSalt(),hash=await hashPw(nw,salt);
+    await w(()=>S.db.doc('accounts/'+S.me.id).update({salt:salt,hash:hash}));
+    ls.set('bish.session',JSON.stringify({id:S.me.id,hash:hash}));form.reset();e('');toast('Password updated.');
+  }catch(x){e(authErr(x))}
+}
+async function saveAvatar(file){
+  try{const d=await shrink(file,192,.8,true,30000);await w(()=>S.db.doc('accounts/'+S.me.id).update({avatar:d}));toast('Profile picture saved.');if(M.blocking){M.blocking=false;closeModal(true)}}
+  catch(e){toast(e&&e.code?errMsg(e):"Couldn't read that picture.",'err')}
+}
+function ensureAvatarGate(){
+  if(!S.me||S.me.role!=='team'||S.me.avatar||M.blocking||$('#modal .scrim'))return;
+  openModal('<h2>Add your profile picture</h2><p class="sub">Team members need a photo so customers know who is coming. You can change it later in Profile.</p><div style="display:grid;place-items:center;padding:8px 0">'+avatar(S.me,96)+'</div><label class="btn primary block" style="cursor:pointer">'+ic('camera')+'<span>Choose a photo</span><input type="file" accept="image/*" class="sr" data-change="avatar"></label><button class="btn block" data-action="logout">Log out</button>',{blocking:true,noFocus:true});
+}
+
+/* ---------- team & roles (admin) ---------- */
+const baseUrl=()=>(S.settings.baseUrl||location.href.split('#')[0]);
+const inviteUrl=t=>baseUrl()+'#join-'+t;
+function viewTeam(){
+  const q=S.teamQ.trim().toLowerCase();
+  const l=S.accounts.filter(a=>!q||a.name.toLowerCase().indexOf(q)>=0||a.email.toLowerCase().indexOf(q)>=0).sort((a,b)=>a.name.localeCompare(b.name));
+  return '<div class="row"><button class="icon-btn" data-action="go" data-view="profile" aria-label="Back">'+ic('back')+'</button><div><p class="eyebrow">User management</p><h1>Team &amp; roles</h1></div></div>'+
+  '<div class="card stack"><div class="row" style="justify-content:space-between"><h3>Signup links</h3><button class="btn sm primary" data-action="new-invite">'+ic('plus')+'<span>Create link</span></button></div><p class="sub">Anyone with a link joins with the Team role. A link works until you delete it.</p>'+
+   (S.invites.length?S.invites.sort((a,b)=>b.createdAt-a.createdAt).map(i=>'<div class="stack" style="gap:8px"><input readonly id="inv-'+esc(i.id)+'" value="'+esc(inviteUrl(i.id))+'" aria-label="Signup link" onfocus="this.select()"><div class="row"><button class="btn sm" data-action="copy-el" data-el="inv-'+esc(i.id)+'">'+ic('copy')+'<span>Copy link</span></button><button class="btn sm danger" data-action="del-invite" data-id="'+esc(i.id)+'">'+ic('trash')+'<span>Delete link</span></button><small class="sub">Created '+esc(fmtStamp(i.createdAt))+'</small></div></div>').join(''):'<p class="sub">No active signup links.</p>')+
+   '<label class="field"><span>Page address used in links</span><input data-change="baseurl" value="'+esc(baseUrl())+'" aria-label="Page address"></label></div>'+
+  '<form class="card form" data-form="addteam"><h3>Add a team member</h3><p class="sub">Team members can see bookings, set prices, confirm and message customers.</p>'+fld('tm-name','First and last name','text','required')+fld('tm-email','Email','email','required')+fld('tm-pw','Temporary password (8+ characters)','password','minlength="8" required autocomplete="new-password"')+'<p class="err" id="tm-err" role="alert"></p><button class="btn primary block" type="submit">'+ic('plus')+'<span>Add team member</span></button></form>'+
+  '<div class="stack"><h3>Everyone</h3><input data-input="teamq" placeholder="Search by name or email" value="'+esc(S.teamQ)+'" aria-label="Search people"><div class="stack" id="roster">'+rosterHTML(l)+'</div></div>';
+}
+function rosterHTML(l){
+  return l.map(a=>'<div class="card flat row" style="justify-content:space-between;flex-wrap:nowrap">'+avatar(a,40)+'<div class="grow"><b>'+esc(a.name)+'</b><p class="sub" style="overflow-wrap:anywhere">'+esc(a.email)+'</p></div>'+(a.role==='admin'?'<span class="st st-scheduled">Admin</span>':'<div class="seg"><button class="'+(a.role==='team'?'on':'')+'" data-action="set-role" data-id="'+esc(a.id)+'" data-role="team">Team</button><button class="'+(a.role==='customer'?'on':'')+'" data-action="set-role" data-id="'+esc(a.id)+'" data-role="customer">Customer</button></div>')+'</div>').join('')||'<p class="sub">No one matches.</p>';
+}
+async function addTeam(form){
+  const e=m=>{$('#tm-err').textContent=m};
+  try{await createAccount({name:$('#tm-name').value,email:$('#tm-email').value,password:$('#tm-pw').value,role:'team'});form.reset();e('');toast('Team member added. They add a photo on first sign in.')}
+  catch(x){e(authErr(x))}
+}
+
+/* ---------- actions ---------- */
+async function copyEl(id){
+  const el=document.getElementById(id);if(!el)return;
+  const text='value' in el?el.value:el.textContent;
+  try{await navigator.clipboard.writeText(text);toast('Copied.')}catch(e){try{el.focus();el.select();toast('Selected. Press copy on your keyboard.')}catch(x){}}
+}
+const A={
+  noop(){return 'native'},
+  go(el){go(el.dataset.view)},
+  'auth-tab'(el){S.authTab=el.dataset.tab;renderAuth()},
+  'auth-home'(){S.joinToken=null;try{location.hash=''}catch(e){}renderAuth()},
+  logout(){logout()},
+  'theme-toggle'(){applyTheme(isDarkNow()?'light':'dark');updateChrome()},
+  theme(el){applyTheme(el.dataset.t);updateChrome();if(S.view==='profile')renderView()},
+  filter(el){S.filter=el.dataset.f;renderView()},
+  'pick-day'(el){S.selDay=S.selDay===el.dataset.day?null:el.dataset.day;renderView()},
+  'clear-day'(){S.selDay=null;renderView()},
+  'cal-nav'(el){let m=S.cal.m+Number(el.dataset.d),y=S.cal.y;if(m<0){m=11;y--}if(m>11){m=0;y++}S.cal={y:y,m:m};renderView()},
+  'new-request'(){openRequest()},
+  'open-booking'(el){openBooking(el.dataset.id)},
+  'close-modal'(){closeModal()},
+  photo(el){openModal('<div class="sh-head"><span></span><button class="icon-btn" data-action="close-modal" aria-label="Close">'+ic('x')+'</button></div><img class="lightbox" src="'+esc(el.getAttribute('src'))+'" alt="Job photo">')},
+  'rm-photo'(el){M.photos.splice(Number(el.dataset.i),1);drawPhotos()},
+  'slot-day'(el){M.slot.day=Number(el.dataset.ts);M.slot.hour=null;redrawSlot()},
+  'slot-hour'(el){M.slot.hour=Number(el.dataset.h);redrawSlot()},
+  'price-modal'(el){openPrice(el.dataset.id)},
+  'slot-modal'(el){openSlot(el.dataset.id)},
+  'cancel-modal'(el){openCancel(el.dataset.id)},
+  'do-cancel'(el){doCancel(el.dataset.id)},
+  'dismiss-rem'(el){S.dismissed[el.dataset.key]=1;renderView()},
+  mine(el){S.mineOnly=el.dataset.v==='1';renderView()},
+  clock(el){clockAct(el.dataset.type)},
+  'close-shift'(el){if(S.busy)return;S.busy=true;w(()=>S.db.collection('timelogs').add({userId:el.dataset.uid,name:el.dataset.name,type:'out',ts:Date.now(),manual:true,by:S.me.id})).then(()=>toast('Shift closed.')).catch(e=>toast(errMsg(e),'err')).then(()=>{S.busy=false})},
+  export(el){exportCsv(el.dataset.kind)},
+  'open-thread'(el){S.thread=el.dataset.id;S.threadName=el.dataset.name;S.view='messages';closeModal(true);renderView();updateChrome();window.scrollTo(0,0)},
+  'thread-back'(){S.thread=null;renderView()},
+  'clear-alerts'(){S.clearedBefore=Date.now();ls.set('bish.cleared.'+S.me.id,String(S.clearedBefore));renderView();updateChrome()},
+  'copy-el'(el){copyEl(el.dataset.el)},
+  'new-invite'(){const t=rid()+Math.random().toString(36).slice(2,6);w(()=>S.db.doc('invites/'+t).set({createdAt:Date.now(),createdBy:S.me.id})).then(()=>toast('Signup link created.')).catch(e=>toast(errMsg(e),'err'))},
+  'del-invite'(el){w(()=>S.db.doc('invites/'+el.dataset.id).delete()).then(()=>toast('Link deleted. It no longer works.')).catch(e=>toast(errMsg(e),'err'))},
+  'set-role'(el){w(()=>S.db.doc('accounts/'+el.dataset.id).update({role:el.dataset.role})).then(()=>toast('Role updated.')).catch(e=>toast(errMsg(e),'err'))}
+};
+const FORMS={
+  login:f=>formSubmit('login',f),signup:f=>formSubmit('signup',f),setup:f=>formSubmit('setup',f),join:f=>formSubmit('join',f),
+  request:submitRequest,price:savePrice,slot:saveSlot,send:sendMsg,name:saveName,pw:savePw,addteam:addTeam,
+  office:async f=>{try{await saveSettings({phone:$('#pf-office').value.trim()});toast('Office phone saved.')}catch(e){toast(errMsg(e),'err')}}
+};
+async function saveSettings(patch){
+  const ref=S.db.doc('settings/main'),s=await ref.get();
+  if(s.exists)await w(()=>ref.update(patch));else await w(()=>ref.set(patch));
+}
+document.addEventListener('click',e=>{
+  if(e.target.hasAttribute&&e.target.hasAttribute('data-scrim')){closeModal();return}
+  const el=e.target.closest('[data-action]');if(!el)return;
+  const fn=A[el.dataset.action];if(!fn)return;
+  const r=fn(el,e);if(r!=='native')e.preventDefault();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&$('#modal .scrim'))closeModal();
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('[role=button][data-action]')){e.preventDefault();e.target.click()}
+});
+document.addEventListener('submit',e=>{
+  const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();
+  const fn=FORMS[f.dataset.form];if(fn)fn(f);
+});
+document.addEventListener('input',e=>{
+  const t=e.target,k=t.dataset&&t.dataset.input;if(!k)return;
+  if(k==='msgq'){S.msgQ=t.value;const l=$('#threadlist');if(l)l.innerHTML=threadListHTML()}
+  if(k==='teamq'){S.teamQ=t.value;const q=S.teamQ.trim().toLowerCase();const r=$('#roster');if(r)r.innerHTML=rosterHTML(S.accounts.filter(a=>!q||a.name.toLowerCase().indexOf(q)>=0||a.email.toLowerCase().indexOf(q)>=0).sort((a,b)=>a.name.localeCompare(b.name)))}
+});
+document.addEventListener('change',e=>{
+  const t=e.target,k=t.dataset&&t.dataset.change;if(!k)return;
+  if(k==='photos')addPhotos(t);
+  else if(k==='avatar'){if(t.files&&t.files[0])saveAvatar(t.files[0]);t.value=''}
+  else if(k==='period'){S.period=t.value;renderView()}
+  else if(k==='cfrom'){S.cFrom=t.value;renderView()}
+  else if(k==='cto'){S.cTo=t.value;renderView()}
+  else if(k==='baseurl'){saveSettings({baseUrl:t.value.trim()}).then(()=>toast('Page address saved.')).catch(e=>toast(errMsg(e),'err'))}
+});
+window.addEventListener('hashchange',()=>{readHash();if(!S.me&&S.db)renderAuth()});
+function readHash(){const m=/^#join-([A-Za-z0-9]+)$/.exec(location.hash||'');S.joinToken=m?m[1]:null}
+
+/* ---------- boot ---------- */
+async function boot(){
+  applyTheme(S.theme);readHash();S.authTab='login';
+  $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card"><p class="sub">Loading…</p></div></div>';
+  const cl=window.claude;
+  if(!cl||!cl.use){noDb();return}
+  const r=await Promise.all([cl.use('db'),cl.use('user'),cl.use('downloads')]);
+  S.db=r[0];S.user=r[1];S.dl=r[2];
+  if(!S.db){noDb();return}
+  try{S.isOwner=S.user?await S.user.isOwner():false}catch(e){}
+  if(S.joinToken){renderAuth();return}
+  if(await restoreSession())return;
+  renderAuth();
+}
+function noDb(){
+  $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card"><div class="note warn">'+ic('x')+'<span>Shared data is not available in this view. Open the page from its claude.ai link while signed in.</span></div></div></div>';
+}
+boot();
+})();
+</script>
