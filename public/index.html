@@ -224,6 +224,9 @@ td.num,th.num{text-align:right}
 <div id="modal"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script>
 (function(){
 'use strict';
@@ -299,8 +302,6 @@ const fmtDate=ts=>new Date(ts).toLocaleDateString([],{weekday:'short',month:'sho
 const fmtTime=ts=>new Date(ts).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
 const fmtSlot=ts=>fmtDate(ts)+' · '+fmtTime(ts);
 const fmtStamp=ts=>new Date(ts).toLocaleDateString([],{month:'short',day:'numeric'})+' at '+fmtTime(ts);
-const b64e=u=>btoa(String.fromCharCode.apply(null,u));
-const b64d=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const rid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 const SERVICES=['Deep Clean','Painting','Handyman Repair','Gutter & Roof Upkeep','Property Upkeep'];
@@ -315,7 +316,7 @@ const SLOT_MS=2*3600000;
 
 /* ---------- state ---------- */
 const S={
-  db:null,user:null,dl:null,isOwner:false,me:null,
+  db:null,auth:null,cfg:null,setupDone:true,creating:false,authInit:false,me:null,
   accounts:[],bookings:[],alerts:[],messages:[],logs:[],invites:[],settings:{},
   view:'bookings',filter:'new',selDay:null,cal:null,thread:null,msgQ:'',teamQ:'',mineOnly:false,
   period:'week',cFrom:'',cTo:'',unsubs:[],dismissed:{},reminding:{},slow:false,
@@ -337,9 +338,10 @@ function openModal(html,opts){
 function closeModal(force){if(M.blocking&&!force)return;$('#modal').innerHTML='';M={}}
 function errMsg(e){
   const c=e&&e.code;
-  if(c==='invalid_argument')return "Couldn't save. This account may not have permission to change shared data. Ask the page owner for Contributor access.";
-  if(c==='quota_exceeded')return 'Storage is full. Remove old records and try again.';
-  if(c==='resource_exhausted')return 'Too many requests at once. Wait a moment and try again.';
+  if(c==='permission-denied')return "Couldn't save. This account doesn't have permission for that.";
+  if(c==='resource-exhausted')return 'Too many requests at once. Wait a moment and try again.';
+  if(c==='unavailable'||c==='auth/network-request-failed')return 'No connection. Check your internet and try again.';
+  if(c==='invalid-argument')return "Couldn't save. The record is too large; try smaller photos.";
   if(c==='revoked')return 'Access to this page changed. Reload to continue.';
   return 'Something went wrong. Try again.';
 }
@@ -351,55 +353,81 @@ async function w(fn){
   }
 }
 
-/* ---------- crypto / accounts ---------- */
-async function hashPw(pw,saltB64){
-  if(!(window.crypto&&crypto.subtle))throw {code:'nocrypto'};
-  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
-  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:b64d(saltB64),iterations:100000,hash:'SHA-256'},key,256);
-  return b64e(new Uint8Array(bits));
-}
-const newSalt=()=>b64e(crypto.getRandomValues(new Uint8Array(16)));
-async function createAccount(o){
-  const id=emailKey(o.email);if(!id||id.indexOf('@')<1)throw {code:'bademail'};
+/* ---------- accounts (Firebase Authentication) ---------- */
+// Account docs live at accounts/{lowercase email}. Passwords are held by Firebase Auth, never in Firestore.
+function checkNew(o){
+  const email=String(o.email||'').trim().toLowerCase(),id=emailKey(email);
+  if(!id||id.indexOf('@')<1||id!==email)throw {code:'bademail'};
   if(String(o.password||'').length<8)throw {code:'shortpw'};
-  const ref=S.db.doc('accounts/'+id);
-  const ex=await ref.get();if(ex.exists)throw {code:'exists'};
-  const salt=newSalt(),hash=await hashPw(o.password,salt);
-  const a={name:o.name.trim(),email:o.email.trim().toLowerCase(),role:o.role,tag:tagFromName(o.name),salt:salt,hash:hash,avatar:'',phone:(o.phone||'').trim(),createdAt:Date.now()};
-  await w(()=>ref.set(a));
-  return Object.assign({id:id},a);
+  return {email:email,id:id,doc:{name:String(o.name||'').trim(),email:email,role:o.role,tag:tagFromName(o.name),avatar:'',phone:String(o.phone||'').trim(),createdAt:Date.now()}};
+}
+// Creates the Firebase Auth user and the account doc for the person filling in the form, then leaves them signed in.
+async function createAccount(o){
+  const n=checkNew(o),ref=S.db.doc('accounts/'+n.id);
+  if(o.invite)n.doc.invite=o.invite;
+  S.creating=true;
+  try{
+    try{await S.auth.createUserWithEmailAndPassword(n.email,o.password)}
+    catch(e){
+      if(!e||e.code!=='auth/email-already-in-use')throw e;
+      // A sign-in with no account doc (an earlier signup that stopped halfway) can be finished with the same password.
+      try{await S.auth.signInWithEmailAndPassword(n.email,o.password)}catch(x){throw {code:'exists'}}
+      const ex=await ref.get();if(ex.exists){await S.auth.signOut();throw {code:'exists'}}
+    }
+    const b=S.db.batch();b.set(ref,n.doc);
+    if(o.role==='admin')b.set(S.db.doc('meta/setup'),{admin:n.id,ts:Date.now()});
+    try{await w(()=>b.commit())}catch(e){try{await S.auth.signOut()}catch(x){}throw e}
+    return Object.assign({id:n.id},n.doc);
+  }finally{S.creating=false}
+}
+// Admin adds a team member: the login is made on a second Firebase app so the admin stays signed in.
+async function createTeamMember(o){
+  const n=checkNew(Object.assign({},o,{role:'team'}));
+  const app2=firebase.apps.find(a=>a.name==='adder')||firebase.initializeApp(S.cfg,'adder');
+  const a2=app2.auth();if(!a2.emulatorConfig)authEmu(a2);
+  try{await a2.setPersistence(firebase.auth.Auth.Persistence.NONE)}catch(e){}
+  try{await a2.createUserWithEmailAndPassword(n.email,o.password)}
+  catch(e){if(e&&e.code==='auth/email-already-in-use')throw {code:'exists'};throw e}
+  finally{try{await a2.signOut()}catch(e){}}
+  await w(()=>S.db.doc('accounts/'+n.id).set(n.doc));
+  return Object.assign({id:n.id},n.doc);
 }
 function authErr(e){
   const c=e&&e.code;
-  if(c==='exists')return 'An account with that email already exists. Sign in instead.';
-  if(c==='bademail')return 'Enter a valid email address.';
-  if(c==='shortpw')return 'Use a password with at least 8 characters.';
-  if(c==='nouser'||c==='badpw')return "That email and password don't match an account.";
-  if(c==='nocrypto')return "This browser can't protect passwords here. Open the page in a current browser.";
+  if(c==='exists'||c==='auth/email-already-in-use')return 'An account with that email already exists. Sign in instead.';
+  if(c==='bademail'||c==='auth/invalid-email')return 'Enter a valid email address.';
+  if(c==='shortpw'||c==='auth/weak-password')return 'Use a password with at least 8 characters.';
+  if(c==='nouser'||c==='badpw'||c==='auth/invalid-credential'||c==='auth/wrong-password'||c==='auth/user-not-found'||c==='auth/invalid-login-credentials')return "That email and password don't match an account.";
+  if(c==='auth/too-many-requests')return 'Too many tries. Wait a few minutes and try again.';
+  if(c==='auth/network-request-failed')return 'No connection. Check your internet and try again.';
   return errMsg(e);
 }
 async function signIn(email,pw){
-  const id=emailKey(email);
-  const snap=await S.db.doc('accounts/'+id).get();
-  if(!snap.exists)throw {code:'nouser'};
-  const a=snap.data(),h=await hashPw(pw,a.salt);
-  if(h!==a.hash)throw {code:'badpw'};
-  S.me=Object.assign({id:id},a);
-  ls.set('bish.session',JSON.stringify({id:id,hash:h}));
-  startApp();
+  await S.auth.signInWithEmailAndPassword(String(email||'').trim(),pw);
+  // onAuthStateChanged loads the account and opens the app.
 }
-async function restoreSession(){
-  let s=null;try{s=JSON.parse(ls.get('bish.session')||'null')}catch(e){}
-  if(!s||!s.id)return false;
+async function loadMe(u){
+  const id=emailKey(u&&u.email);
   try{
-    const snap=await S.db.doc('accounts/'+s.id).get();
-    if(!snap.exists||snap.data().hash!==s.hash){ls.del('bish.session');return false}
-    S.me=Object.assign({id:s.id},snap.data());startApp();return true;
-  }catch(e){return false}
+    const snap=await S.db.doc('accounts/'+id).get();
+    if(!snap.exists){
+      await S.auth.signOut();S.me=null;await renderAuth();
+      authError('This sign-in has no Bish Cleanup account yet. Use Create account with the same email and password to finish.');
+      return;
+    }
+    S.me=Object.assign({id:id},snap.data());startApp();
+  }catch(e){console.warn('loadMe',e);S.me=null;await renderAuth();authError(errMsg(e))}
+}
+function onAuth(u){
+  if(S.creating)return;
+  const first=!S.authInit;S.authInit=true;
+  if(u){if(!S.me||S.me.id!==emailKey(u.email))loadMe(u);return}
+  if(S.me||first){stopSubs();S.me=null;S.view='bookings';S.thread=null;closeModal(true);renderAuth()}
 }
 function logout(){
-  stopSubs();ls.del('bish.session');S.me=null;S.view='bookings';S.thread=null;
+  stopSubs();S.me=null;S.authTab='login';S.view='bookings';S.thread=null;
   closeModal(true);renderAuth();
+  S.auth.signOut().catch(()=>{});
 }
 
 /* ---------- subscriptions ---------- */
@@ -408,7 +436,7 @@ const docs=snap=>snap.docs.map(d=>Object.assign({id:d.id},d.data()));
 function sub(q,fn,name){
   let first=true;
   const t=setTimeout(()=>{if(first){S.slow=true;scheduleRender()}},10000);
-  const un=q.onSnapshot(snap=>{if(first){first=false;clearTimeout(t);if(S.slow){S.slow=false}}fn(snap)},err=>{clearTimeout(t);console.warn(name,err);if(err&&err.code==='revoked'){S.revoked=true;scheduleRender()}});
+  const un=q.onSnapshot(snap=>{if(first){first=false;clearTimeout(t);if(S.slow){S.slow=false}}fn(snap)},err=>{clearTimeout(t);console.warn(name,err);if(err&&(err.code==='revoked'||err.code==='permission-denied')){S.revoked=true;scheduleRender()}});
   S.unsubs.push(()=>{clearTimeout(t);un()});
 }
 const isStaff=()=>S.me&&(S.me.role==='admin'||S.me.role==='team');
@@ -430,7 +458,7 @@ function startApp(){
   if(role==='admin')sub(db.collection('accounts'),s=>{S.accounts=docs(s);afterData()},'accounts');
   else if(role==='team')sub(db.collection('accounts').where('role','in',['admin','team']),s=>{S.accounts=docs(s);afterData()},'accounts');
   sub(isStaff()?db.collection('bookings'):db.collection('bookings').where('customerId','==',id),s=>{S.bookings=docs(s);afterData()},'bookings');
-  sub(db.collection('alerts').where('to','in',isStaff()?['staff','u:'+id]:['u:'+id]),s=>{
+  sub((isStaff()?db.collection('alerts').where('to','in',['staff','u:'+id]):db.collection('alerts').where('to','==','u:'+id)),s=>{
     const list=docs(s);
     if(S.alertsInit){s.docChanges().forEach(c=>{if(c.type==='added'){const d=c.doc.data();if(d.ts>S.startedAt)toast(d.title+(d.detail?' — '+d.detail:''))}})}
     S.alertsInit=true;S.alerts=list;afterData();
@@ -522,17 +550,20 @@ const TAGLINE='Property upkeep &amp; handyman services in Lewis, Cowlitz, Clark 
 async function renderAuth(){
   document.body.classList.remove('shell');
   $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card"><p class="sub">Loading…</p></div></div>';
-  let empty=false;
-  try{const s=await S.db.collection('accounts').limit(1).get();empty=s.empty}catch(e){}
+  let empty=false,offline=false;
+  try{const s=await S.db.doc('meta/setup').get();empty=!s.exists}catch(e){console.warn('setup check',e);offline=true}
+  if(S.me)return;
   let card='';
   if(S.joinToken){
     let ok=false;try{const iv=await S.db.doc('invites/'+S.joinToken).get();ok=iv.exists}catch(e){}
     card=ok?joinForm():'<div class="note warn">'+ic('x')+'<span>This signup link is no longer active. Ask the admin for a new one.</span></div><button class="btn block" data-action="auth-home">Back to sign in</button>';
   }else if(empty){
-    card=S.isOwner?setupForm():'<div class="note">'+ic('clock')+'<span>Bish Cleanup is not set up yet. The page owner needs to create the admin account first.</span></div>';
+    card=setupForm();
   }else{
     card=(S.authTab==='signup')?signupForm():loginForm();
+    if(offline)card='<div class="note warn">'+ic('x')+'<span>Couldn\'t reach the server. Check your connection.</span></div><button class="btn block" data-action="auth-home">Try again</button>'+card;
   }
+  if(S.me)return;
   $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card stack">'+card+'</div></div>';
 }
 function tabsHTML(){
@@ -561,18 +592,18 @@ async function formSubmit(name,form){
     else if(name==='signup'){
       const a=await createAccount({name:v('su-name'),email:v('su-email'),phone:v('su-phone'),password:v('su-pw'),role:'customer'});
       await pushMessage(a.id,a.name,'Hi '+a.name.split(' ')[0]+'! Welcome to Bish Cleanup. We handle property upkeep and handyman work in Lewis, Cowlitz, Clark and Thurston counties. Request a quote any time and we will confirm a price and time.',true);
-      await signIn(a.email,v('su-pw'));
+      await loadMe(S.auth.currentUser);
     }
     else if(name==='setup'){
       const a=await createAccount({name:v('st-name'),email:v('st-email'),phone:v('st-phone'),password:v('st-pw'),role:'admin'});
-      if(v('st-phone').trim())await w(()=>S.db.doc('settings/main').set(Object.assign({},S.settings,{phone:v('st-phone').trim()})));
-      await signIn(a.email,v('st-pw'));
+      if(v('st-phone').trim())await w(()=>S.db.doc('settings/main').set({phone:v('st-phone').trim()},{merge:true}));
+      await loadMe(S.auth.currentUser);
     }
     else if(name==='join'){
       const iv=await S.db.doc('invites/'+S.joinToken).get();if(!iv.exists)throw {code:'noinvite'};
-      const a=await createAccount({name:v('jn-name'),email:v('jn-email'),phone:v('jn-phone'),password:v('jn-pw'),role:'team'});
-      history.replaceState&&0;S.joinToken=null;try{location.hash=''}catch(e){}
-      await signIn(a.email,v('jn-pw'));
+      const a=await createAccount({name:v('jn-name'),email:v('jn-email'),phone:v('jn-phone'),password:v('jn-pw'),role:'team',invite:S.joinToken});
+      S.joinToken=null;try{location.hash=''}catch(e){}
+      await loadMe(S.auth.currentUser);
     }
   }catch(e){
     if(e&&e.code==='noinvite')authError('This signup link is no longer active.');else authError(authErr(e));
@@ -947,7 +978,11 @@ async function exportCsv(kind){
   }
   const csv=rows.map(r=>r.map(csvCell).join(',')).join('\n');
   const name='bish-cleanup-'+(kind==='detail'?'shifts':'totals')+'-'+dayKey(r[0])+'_to_'+dayKey(r[1]-1)+'.csv';
-  if(S.dl){try{await S.dl.save({filename:name,data:csv});toast('CSV ready.');return}catch(e){if(e&&e.code==='declined')return}}
+  try{
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv'})),a=document.createElement('a');
+    a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);toast('CSV downloaded.');return;
+  }catch(e){}
   openModal('<div class="sh-head"><h2>Copy the CSV</h2><button class="icon-btn" data-action="close-modal" aria-label="Close">'+ic('x')+'</button></div><p class="sub">Saving files is not available here. Copy this text into a file named '+esc(name)+'.</p><textarea id="csvbox" rows="10" readonly>'+esc(csv)+'</textarea><button class="btn primary block" data-action="copy-el" data-el="csvbox">'+ic('copy')+'<span>Copy</span></button>');
 }
 
@@ -1019,10 +1054,11 @@ async function savePw(form){
   const e=m=>{$('#pw-err').textContent=m},cur=$('#pw-cur').value,nw=$('#pw-new').value;
   if(nw.length<8){e('Use at least 8 characters.');return}
   try{
-    if(await hashPw(cur,S.me.salt)!==S.me.hash){e('Current password is not right.');return}
-    const salt=newSalt(),hash=await hashPw(nw,salt);
-    await w(()=>S.db.doc('accounts/'+S.me.id).update({salt:salt,hash:hash}));
-    ls.set('bish.session',JSON.stringify({id:S.me.id,hash:hash}));form.reset();e('');toast('Password updated.');
+    const u=S.auth.currentUser;if(!u){logout();return}
+    try{await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,cur))}
+    catch(x){const c=x&&x.code;if(c==='auth/wrong-password'||c==='auth/invalid-credential'||c==='auth/invalid-login-credentials'){e('Current password is not right.');return}throw x}
+    await u.updatePassword(nw);
+    form.reset();e('');toast('Password updated.');
   }catch(x){e(authErr(x))}
 }
 async function saveAvatar(file){
@@ -1052,8 +1088,10 @@ function rosterHTML(l){
 }
 async function addTeam(form){
   const e=m=>{$('#tm-err').textContent=m};
-  try{await createAccount({name:$('#tm-name').value,email:$('#tm-email').value,password:$('#tm-pw').value,role:'team'});form.reset();e('');toast('Team member added. They add a photo on first sign in.')}
+  const btn=form.querySelector('button[type=submit]');if(btn)btn.disabled=true;
+  try{await createTeamMember({name:$('#tm-name').value,email:$('#tm-email').value,password:$('#tm-pw').value});form.reset();e('');toast('Team member added. They add a photo on first sign in.')}
   catch(x){e(authErr(x))}
+  if(btn)btn.disabled=false;
 }
 
 /* ---------- actions ---------- */
@@ -1104,8 +1142,7 @@ const FORMS={
   office:async f=>{try{await saveSettings({phone:$('#pf-office').value.trim()});toast('Office phone saved.')}catch(e){toast(errMsg(e),'err')}}
 };
 async function saveSettings(patch){
-  const ref=S.db.doc('settings/main'),s=await ref.get();
-  if(s.exists)await w(()=>ref.update(patch));else await w(()=>ref.set(patch));
+  await w(()=>S.db.doc('settings/main').set(patch,{merge:true}));
 }
 document.addEventListener('click',e=>{
   if(e.target.hasAttribute&&e.target.hasAttribute('data-scrim')){closeModal();return}
@@ -1139,21 +1176,35 @@ window.addEventListener('hashchange',()=>{readHash();if(!S.me&&S.db)renderAuth()
 function readHash(){const m=/^#join-([A-Za-z0-9]+)$/.exec(location.hash||'');S.joinToken=m?m[1]:null}
 
 /* ---------- boot ---------- */
+// On Firebase Hosting the web config is served at /__/firebase/init.json.
+// Anywhere else, paste the config from Firebase console > Project settings > Your apps into FIREBASE_CONFIG.
+const FIREBASE_CONFIG=null;
+async function loadConfig(){
+  if(FIREBASE_CONFIG)return FIREBASE_CONFIG;
+  try{const r=await fetch('/__/firebase/init.json',{cache:'no-store'});if(r.ok)return await r.json()}catch(e){}
+  return null;
+}
+// Local testing: a demo-* project on localhost talks to the Firebase emulators.
+const useEmu=()=>/^demo-/.test((S.cfg&&S.cfg.projectId)||'')&&/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+function authEmu(a){if(useEmu())a.useEmulator('http://'+location.hostname+':9099',{disableWarnings:true})}
 async function boot(){
   applyTheme(S.theme);readHash();S.authTab='login';
   $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card"><p class="sub">Loading…</p></div></div>';
-  const cl=window.claude;
-  if(!cl||!cl.use){noDb();return}
-  const r=await Promise.all([cl.use('db'),cl.use('user'),cl.use('downloads')]);
-  S.db=r[0];S.user=r[1];S.dl=r[2];
-  if(!S.db){noDb();return}
-  try{S.isOwner=S.user?await S.user.isOwner():false}catch(e){}
-  if(S.joinToken){renderAuth();return}
-  if(await restoreSession())return;
-  renderAuth();
+  if(!window.firebase||!firebase.initializeApp){noDb('The app could not load. Check your internet connection and reload.');return}
+  const cfg=await loadConfig();
+  if(!cfg||!cfg.apiKey){noDb('This copy of Bish Cleanup is not connected to Firebase yet. Open it from its Firebase Hosting address, or add the Firebase web config to FIREBASE_CONFIG in index.html.');return}
+  S.cfg=cfg;
+  try{
+    firebase.initializeApp(cfg);
+    S.auth=firebase.auth();S.db=firebase.firestore();
+    if(useEmu())S.db.useEmulator(location.hostname,8080);
+    authEmu(S.auth);
+  }catch(e){console.warn(e);noDb('The app could not connect to Firebase. Reload to try again.');return}
+  ls.del('bish.session');
+  S.auth.onAuthStateChanged(onAuth);
 }
-function noDb(){
-  $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card"><div class="note warn">'+ic('x')+'<span>Shared data is not available in this view. Open the page from its claude.ai link while signed in.</span></div></div></div>';
+function noDb(msg){
+  $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card"><div class="note warn">'+ic('x')+'<span>'+esc(msg)+'</span></div></div></div>';
 }
 boot();
 })();
