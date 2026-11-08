@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// Bish Cleanup security rules.
+// Account docs are keyed by the signed-in user's lowercase email: accounts/{email}.
+// Roles: admin, team (together "staff"), customer.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null && request.auth.token.email is string; }
+    function myId() { return request.auth.token.email.lower(); }
+    function acct(id) { return /databases/$(database)/documents/accounts/$(id); }
+    function myRole() { return get(acct(myId())).data.role; }
+    function hasAccount() { return signedIn() && exists(acct(myId())); }
+    function isAdmin() { return hasAccount() && myRole() == 'admin'; }
+    function isStaff() { return hasAccount() && myRole() in ['admin', 'team']; }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
+    function setupPath() { return /databases/$(database)/documents/meta/setup; }
+
+    // Written once, in the same batch as the first admin account. Its existence closes admin setup.
+    match /meta/setup {
+      allow get: if true;
+      allow create: if signedIn()
+        && request.resource.data.admin == myId()
+        && getAfter(acct(myId())).data.role == 'admin';
+    }
+
+    match /accounts/{id} {
+      function newAccount() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['name', 'email', 'role', 'tag', 'avatar', 'phone', 'createdAt', 'invite'])
+          && d.email == id && d.name is string && d.name.size() > 0 && d.name.size() <= 120;
+      }
+      allow read: if signedIn() && (
+        id == myId() || isAdmin()
+        || (isStaff() && resource.data.role in ['admin', 'team']));
+
+      allow create: if signedIn() && newAccount() && (
+        (id == myId() && (
+          request.resource.data.role == 'customer'
+          || (request.resource.data.role == 'team'
+              && request.resource.data.invite is string
+              && exists(/databases/$(database)/documents/invites/$(request.resource.data.invite)))
+          || (request.resource.data.role == 'admin'
+              && !exists(setupPath())
+              && getAfter(setupPath()).data.admin == id)))
+        || (id != myId() && isAdmin() && request.resource.data.role == 'team'));
+
+      allow update: if signedIn() && (
+        (id == myId() && !changed().hasAny(['role', 'email', 'invite', 'createdAt']))
+        || (id != myId() && isAdmin() && resource.data.role != 'admin'
+            && changed().hasOnly(['role']) && request.resource.data.role in ['team', 'customer']));
+
+      allow delete: if isAdmin() && id != myId();
+    }
+
+    match /bookings/{id} {
+      allow read: if isStaff() || (signedIn() && resource.data.customerId == myId());
+      allow create: if isStaff() || (signedIn()
+        && request.resource.data.customerId == myId()
+        && request.resource.data.status == 'new'
+        && request.resource.data.price == 0
+        && request.resource.data.assigneeId == ''
+        && request.resource.data.tag == '');
+      // Customers only mark their own booking's reminder as sent.
+      allow update: if isStaff() || (signedIn()
+        && resource.data.customerId == myId()
+        && changed().hasOnly(['remindedSlot']));
+      allow delete: if isAdmin();
+    }
+
+    match /alerts/{id} {
+      allow read: if isStaff() || (signedIn() && resource.data.to == 'u:' + myId());
+      allow create: if hasAccount() && request.resource.data.to is string && request.resource.data.title is string;
+      allow update, delete: if isAdmin();
+    }
+
+    match /messages/{id} {
+      allow read: if isStaff() || (signedIn() && resource.data.threadId == myId());
+      allow create: if isStaff() || (hasAccount()
+        && request.resource.data.threadId == myId()
+        && (request.resource.data.fromId == myId()
+            || (request.resource.data.auto == true && request.resource.data.fromId == 'system')));
+      allow update, delete: if isAdmin();
+    }
+
+    match /timelogs/{id} {
+      allow read: if isAdmin() || (isStaff() && resource.data.userId == myId());
+      allow create: if isAdmin() || (isStaff() && request.resource.data.userId == myId());
+      allow update, delete: if isAdmin();
+    }
+
+    // Invite tokens are the secret in a signup link: anyone may look one up by id, only the admin may list them.
+    match /invites/{token} {
+      allow get: if true;
+      allow list, write: if isAdmin();
+    }
+
+    match /settings/{id} {
+      allow read: if hasAccount();
+      allow write: if isAdmin();
+    }
+  }
+}
