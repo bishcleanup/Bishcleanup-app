@@ -12,7 +12,15 @@ The app runs on Firebase:
 - **Cloud Firestore** holds the data. `firestore.rules` enforces who can read and change what (admin, team, customer).
 - **Firebase Hosting** serves `public/`. On Hosting the page loads its Firebase config from `/__/firebase/init.json`, so no keys are in the code. To host it somewhere else, paste your web app config into `FIREBASE_CONFIG` near the bottom of `public/index.html`.
 
-## First deploy
+## Live site
+
+https://bish-cleanup.web.app (Firebase project `bish-cleanup`). To redeploy after changes:
+
+```bash
+firebase deploy --only firestore,hosting
+```
+
+## First deploy (new project)
 
 1. In the [Firebase console](https://console.firebase.google.com), create a project, add a **Web app**, turn on **Authentication → Sign-in method → Email/Password**, and create a **Firestore database** (production mode).
 2. Install the CLI and deploy from this folder:

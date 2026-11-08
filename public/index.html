@@ -550,8 +550,8 @@ const TAGLINE='Property upkeep &amp; handyman services in Lewis, Cowlitz, Clark 
 async function renderAuth(){
   document.body.classList.remove('shell');
   $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card"><p class="sub">Loading…</p></div></div>';
-  let empty=false;
-  try{const s=await S.db.doc('meta/setup').get();empty=!s.exists}catch(e){}
+  let empty=false,offline=false;
+  try{const s=await S.db.doc('meta/setup').get();empty=!s.exists}catch(e){console.warn('setup check',e);offline=true}
   if(S.me)return;
   let card='';
   if(S.joinToken){
@@ -561,6 +561,7 @@ async function renderAuth(){
     card=setupForm();
   }else{
     card=(S.authTab==='signup')?signupForm():loginForm();
+    if(offline)card='<div class="note warn">'+ic('x')+'<span>Couldn\'t reach the server. Check your connection.</span></div><button class="btn block" data-action="auth-home">Try again</button>'+card;
   }
   if(S.me)return;
   $('#app').innerHTML='<div class="auth">'+heroHTML('Bish <span class="lime">Cleanup</span>',TAGLINE)+'<div class="card stack">'+card+'</div></div>';
